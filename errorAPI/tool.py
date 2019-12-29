@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 import importlib
 from errorAPI.tools import *
 from typing import Type
+from .dataset import Dataset
 
 class ToolCreator:        
     @staticmethod
@@ -12,8 +13,12 @@ class ToolCreator:
         print("Available tools:")
 
         d = os.path.dirname(__file__)+'/tools/'
-        print([o for o in os.listdir(d) 
-                            if os.path.isdir(os.path.join(d,o))])
+        tools = [o for o in os.listdir(d) 
+                            if os.path.isdir(os.path.join(d,o))]
+        print(tools)
+        return tools
+                            
+        
 
     def createTool(self, which_tool=None, configuration=None):
         if which_tool is None or configuration is None:
@@ -33,5 +38,5 @@ class Tool(ABC):
 
     # Implemented in base classes
     @abstractmethod
-    def run(self, dataset: Type[dataset]):
+    def run(self, dataset: Type[Dataset]):
         pass

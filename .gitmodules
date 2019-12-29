@@ -1,0 +1,3 @@
+[submodule "errorAPI/tools/dBoost/dBoost"]
+	path = errorAPI/tools/dBoost/dBoost
+	url = https://github.com/cpitclaudel/dBoost
