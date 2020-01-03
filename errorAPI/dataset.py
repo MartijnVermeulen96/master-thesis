@@ -27,6 +27,11 @@ class Dataset:
         The constructor creates a dataset.
         """
         self.name = dataset_dictionary["name"]
+        if "path" not in dataset_dictionary:
+            dataset_dictionary["path"] = "datasets/" + dataset_dictionary["name"] + "/dirty.csv"
+            dataset_dictionary["clean_path"] = "datasets/" + dataset_dictionary["name"] + "/clean.csv"
+        self.dataset_dictionary = dataset_dictionary
+
         self.dataframe = self.read_csv_dataset(dataset_dictionary["path"])
         if "clean_path" in dataset_dictionary:
             self.clean_dataframe = self.read_csv_dataset(dataset_dictionary["clean_path"])
@@ -38,6 +43,11 @@ class Dataset:
             if self.dataframe.shape != self.repaired_dataframe.shape:
                 sys.stderr.write("Repaired dataset is not in the equal size to the dataset!\n")
             self.repairs_dictionary = self.get_repairs_dictionary()
+    
+            
+            if self.dataframe.shape != self.clean_dataframe.shape:
+                sys.stderr.write("Ground truth is not in the equal size to the dataset!\n")
+            self.actual_errors_dictionary = self.get_actual_errors_dictionary()
 
     def read_csv_dataset(self, dataset_path):
         """

@@ -40,3 +40,7 @@ class Tool(ABC):
     @abstractmethod
     def run(self, dataset: Type[Dataset]):
         pass
+
+    # The help function
+    def help(self):
+        print("No help specified for this tool.")

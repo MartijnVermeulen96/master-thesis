@@ -1,3 +1,6 @@
 [submodule "errorAPI/tools/dBoost/dBoost"]
 	path = errorAPI/tools/dBoost/dBoost
 	url = https://github.com/cpitclaudel/dBoost
+[submodule "errorAPI/tools/raha/raha"]
+	path = errorAPI/tools/raha/raha
+	url = https://github.com/BigDaMa/raha
