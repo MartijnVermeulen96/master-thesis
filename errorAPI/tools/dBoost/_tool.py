@@ -4,10 +4,14 @@ from typing import Type
 from errorAPI.dataset import Dataset
 import contextlib
 
-from .dBoost import dboost
-from .dBoost.dboost import features, analyzers, models, cli
-from .dBoost.dboost.utils.read import stream_tuples
-from .dBoost.dboost.utils.printing import print_rows, debug
+# Import the newest dBoost
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), 'dBoost/'))
+import dboost
+from dboost import features, analyzers, models, cli
+from dboost.utils.read import stream_tuples
+from dboost.utils.printing import print_rows, debug
 REGISTERED_MODELS = models.ALL()
 REGISTERED_ANALYZERS = analyzers.ALL()
 
