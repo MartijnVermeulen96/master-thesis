@@ -4,3 +4,4 @@
 [submodule "errorAPI/tools/raha/raha"]
 	path = errorAPI/tools/raha/raha
 	url = https://github.com/BigDaMa/raha
+	ignore = dirty
