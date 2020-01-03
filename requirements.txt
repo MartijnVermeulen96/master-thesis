@@ -1,3 +1,6 @@
 pandas
 sklearn
 numpy
+scipy
+matplotlib
+prettytable
