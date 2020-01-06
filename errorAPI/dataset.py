@@ -57,11 +57,11 @@ class Dataset:
                                             keep_default_na=False, low_memory=False).apply(lambda x: x.str.strip())
         return dataset_dataframe
 
-    def write_csv_dataset(self, dataset_path, dataframe):
+    def write_csv_dataset(self, dataset_path, dataframe, header=False):
         """
         This method writes a dataset to a csv file path.
         """
-        dataframe.to_csv(dataset_path, sep=",", header=True, index=False, encoding="utf-8")
+        dataframe.to_csv(dataset_path, sep=",", header=header, index=False, encoding="utf-8")
 
     def get_actual_errors_dictionary(self):
         """
@@ -96,6 +96,10 @@ class Dataset:
     def evaluate_data_cleaning(self, correction_dictionary, sampled_rows_dictionary=False):
         """
         This method evaluates data cleaning process.
+
+        Returns 6 scores for 2 types:
+        Detection; Precision - Recall - F1
+        Correction; Precision - Recall - F1
         """
         actual_errors = dict(self.actual_errors_dictionary)
         if sampled_rows_dictionary:
@@ -118,6 +122,36 @@ class Dataset:
         ec_r = 0.0 if len(actual_errors) == 0 else ec_tp / len(actual_errors)
         ec_f = 0.0 if (ec_p + ec_r) == 0.0 else (2 * ec_p * ec_r) / (ec_p + ec_r)
         return [ed_p, ed_r, ed_f, ec_p, ec_r, ec_f]
+
+
+    def evaluate_detection_row_wise(self, correction_dictionary, sampled_rows_dictionary=False):
+        """
+        This method evaluates data cleaning process per row (if a row is successfully classified).
+        """
+        actual_errors = dict(self.actual_errors_dictionary)
+        if sampled_rows_dictionary:
+            actual_errors = {(i, j): self.actual_errors_dictionary[(i, j)]
+                             for (i, j) in self.actual_errors_dictionary if i in sampled_rows_dictionary}
+        ed_tp = 0.0
+        output_size = 0.0
+
+        actual_error_rows = set()
+        for detection in actual_errors:
+            actual_error_rows.add(detection[0])
+        
+        found_error_rows = set()
+        for detection in correction_dictionary:
+            found_error_rows.add(detection[0])
+        
+        for found_row in found_error_rows:
+            output_size += 1
+            if found_row in actual_error_rows:
+                ed_tp += 1.0
+
+        ed_p = 0.0 if output_size == 0 else ed_tp / output_size
+        ed_r = 0.0 if len(actual_errors) == 0 else ed_tp / len(actual_errors)
+        ed_f = 0.0 if (ed_p + ed_r) == 0.0 else (2 * ed_p * ed_r) / (ed_p + ed_r)
+        return [ed_p, ed_r, ed_f]
 ########################################
 
 

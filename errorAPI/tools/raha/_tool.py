@@ -27,4 +27,5 @@ class Raha(Tool):
 
     def run(self, dataset: Type[Dataset]):
         print("TODO")
-        return self.detection.run(dataset.dataset_dictionary)
+        with contextlib.redirect_stdout(None):
+            return self.detection.run(dataset.dataset_dictionary)

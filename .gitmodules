@@ -5,3 +5,7 @@
 	path = errorAPI/tools/raha/raha
 	url = https://github.com/BigDaMa/raha
 	ignore = dirty
+[submodule "errorAPI/tools/FAHES/FAHES_Code"]
+	path = errorAPI/tools/FAHES/FAHES_Code
+	url = https://github.com/daqcri/FAHES_Code
+	ignore = dirty

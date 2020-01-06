@@ -14,7 +14,7 @@ class ToolCreator:
 
         d = os.path.dirname(__file__)+'/tools/'
         tools = [o for o in os.listdir(d) 
-                            if os.path.isdir(os.path.join(d,o))]
+                            if os.path.isdir(os.path.join(d,o)) and not(o.startswith("_"))]
         print(tools)
         return tools
                             
