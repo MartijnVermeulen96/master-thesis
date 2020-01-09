@@ -57,7 +57,7 @@ class Dataset:
                                             keep_default_na=False, low_memory=False).apply(lambda x: x.str.strip())
         return dataset_dataframe
 
-    def write_csv_dataset(self, dataset_path, dataframe, header=False):
+    def write_csv_dataset(self, dataset_path, dataframe, header=True):
         """
         This method writes a dataset to a csv file path.
         """

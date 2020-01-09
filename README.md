@@ -22,3 +22,7 @@ This repo contains various submodules. To pull these modules, execute:
 ## FAHES 
 
     g++
+
+## ForbiddenItemSets
+
+    cmake

@@ -65,7 +65,7 @@ class dBoost(Tool):
         
         dataset_path = os.path.join(tempfile.gettempdir(), dataset.name + "-" + strategy_name_hash + ".csv")
         
-        dataset.write_csv_dataset(dataset_path, dataset.dataframe)
+        dataset.write_csv_dataset(dataset_path, dataset.dataframe, header=False)
         params = ["-F", ",", "--statistical", "0.5"] + ["--" + self.configuration["Params"][0]] + self.configuration["Params"][1:] + [dataset_path]
 
         parser = cli.get_stdin_parser()
@@ -91,5 +91,6 @@ class dBoost(Tool):
                 for linum, (x, X, discrepancies) in results:
                     for dis in discrepancies:
                         outlier_cells[(linum, dis[0][0] - 1)] = "JUST A DUMMY VALUE"
-                    
+        
+        os.remove(dataset_path)
         return outlier_cells
