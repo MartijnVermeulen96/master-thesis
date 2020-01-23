@@ -1,6 +1,7 @@
 from errorAPI.tool import Tool
 
 class FDchecker(Tool):
+    default_configuration = {}
     def __init__(self, configuration):
         print("Creating FDchecker")
         super().__init__("FDchecker", configuration)

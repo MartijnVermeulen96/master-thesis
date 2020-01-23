@@ -13,6 +13,7 @@
 import sys
 import itertools
 import pandas
+import os
 ########################################
 
 
@@ -21,6 +22,10 @@ class Dataset:
     """
     The dataset class.
     """
+    @staticmethod
+    def list_datasets(directory='datasets'):
+        return os.listdir(directory)
+
 
     def __init__(self, dataset_dictionary):
         """

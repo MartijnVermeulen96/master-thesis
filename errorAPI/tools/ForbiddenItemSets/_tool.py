@@ -30,7 +30,7 @@ class ForbiddenItemSets(Tool):
                 
             print("ForbiddenItemSets not made yet, executing cmake & make now")
             print(FBI_path_dir)
-            p = subprocess.Popen(["cmake"], cwd=FBI_path_dir)
+            p = subprocess.Popen(["cmake", "."], cwd=FBI_path_dir)
             p.wait()
             p = subprocess.Popen(["make"], cwd=FBI_path_dir)
             p.wait()

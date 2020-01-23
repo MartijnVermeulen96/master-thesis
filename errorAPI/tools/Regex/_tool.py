@@ -2,6 +2,7 @@ from errorAPI.tool import Tool
 import re
 
 class Regex(Tool):
+    default_configuration = {}
     def __init__(self, configuration):
         print("Creating Regex")
         super().__init__("Regex", configuration)

@@ -13,7 +13,7 @@ import raha
 
 class Raha(Tool):
     default_configuration = {}
-    example_configurations = []
+    example_configurations = [{}]
     
     def __init__(self, configuration):
         print("Creating Raha")

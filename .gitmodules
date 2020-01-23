@@ -18,3 +18,6 @@
 [submodule "errorAPI/tools/ForbiddenItemSets/fbiminer"]
 	path = errorAPI/tools/ForbiddenItemSets/fbiminer
 	url = https://github.com/j-r77/fbiminer
+[submodule "errorAPI/tools/HoloClean/holoclean"]
+	path = errorAPI/tools/HoloClean/holoclean
+	url = https://github.com/HoloClean/holoclean

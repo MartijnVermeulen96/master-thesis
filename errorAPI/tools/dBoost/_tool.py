@@ -92,5 +92,9 @@ class dBoost(Tool):
                     for dis in discrepancies:
                         outlier_cells[(linum, dis[0][0] - 1)] = "JUST A DUMMY VALUE"
         
-        os.remove(dataset_path)
+        try:
+            os.remove(dataset_path)
+        except:
+            print("Could not remove temp file")
+        
         return outlier_cells
