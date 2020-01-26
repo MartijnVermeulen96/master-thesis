@@ -12,12 +12,9 @@
 [submodule "errorAPI/tools/_NADEEF/NADEEF"]
 	path = errorAPI/tools/_NADEEF/NADEEF
 	url = https://github.com/daqcri/NADEEF
-[submodule "errorAPI/tools/_ForbiddenItemSets/fbiminer"]
-	path = errorAPI/tools/_ForbiddenItemSets/fbiminer
-	url = https://github.com/j-r77/fbiminer
-[submodule "errorAPI/tools/ForbiddenItemSets/fbiminer"]
-	path = errorAPI/tools/ForbiddenItemSets/fbiminer
-	url = https://github.com/j-r77/fbiminer
 [submodule "errorAPI/tools/HoloClean/holoclean"]
 	path = errorAPI/tools/HoloClean/holoclean
 	url = https://github.com/HoloClean/holoclean
+[submodule "fbiminer"]
+	path = errorAPI/tools/ForbiddenItemSets/fbiminer
+	url = https://github.com/MartijnVermeulen96/fbiminer

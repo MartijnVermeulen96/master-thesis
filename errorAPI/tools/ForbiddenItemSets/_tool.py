@@ -52,19 +52,19 @@ class ForbiddenItemSets(Tool):
         
         dataset.write_csv_dataset(dataset_path, dataset.dataframe)
 
-        process = self.FBI_path + " " + dataset_path + " " + str(self.configuration["Tau"]) + " > " + result_path
+        process = self.FBI_path + " " + dataset_path + " " + str(self.configuration["Tau"]) + " 0 > " + result_path
         os.system(process)
 
         # Parse the results
         with open(result_path) as file:
             file_contents = file.read()
             
-        rules = [[y.strip().split("=") for y in z] for z in [x[1:-1].split(",") for x in file_contents.split("\n") if x.startswith("(")]]
-        res = pd.Series([True]*len(dataset.dataframe))
+        rules = [[y.strip().split("=") for y in z] for z in [x[1:-1].split(",") for x in file_contents.split("\n") if x.endswith(")")]]
         outlier_cells = {}
         for rule in rules:
             cols = [x[0] for x in rule]
             
+            res = pd.Series([True]*len(dataset.dataframe))
             for part in rule:
                 res = res & (dataset.dataframe[part[0]] == part[1])
             row_list = list(res[res].index)
