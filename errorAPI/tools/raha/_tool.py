@@ -26,6 +26,10 @@ class Raha(Tool):
         for param in configuration:
             setattr(self.detection, param, configuration[param])
 
+        # Human cost
+        self.human_cost = self.detection.LABELING_BUDGET
+        self.human_accuracy = self.detection.USER_LABELING_ACCURACY
+
         super().__init__("Raha", configuration)
 
     def help(self):

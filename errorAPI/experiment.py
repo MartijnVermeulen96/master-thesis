@@ -6,7 +6,7 @@ import pandas as pd
 import time
 from sqlalchemy import create_engine
 from datetime import datetime
-
+import contextlib
 
 class Experiment:
     results_columns = ["started_at", "runtime", "dataset", "tool_name", "tool_configuration", "human_interaction",
@@ -72,7 +72,10 @@ class Experiment:
         result["started_at"] = datetime.now()
         start = time.time()
         try:
-            results = tool.run(d)
+            f = open(os.devnull, 'w')
+            with contextlib.redirect_stdout(f):
+                with contextlib.redirect_stderr(f):
+                    results = tool.run(d)
             result["error_text"] = ""
             result["error"] = False
 
@@ -91,6 +94,10 @@ class Experiment:
         result["cell_prec"] = scores[0]
         result["cell_rec"] = scores[1]
         result["cell_f1"] = scores[2]
+
+        # Human cost
+        result["human_interaction"] = tool.human_interaction
+        result["human_cost"] = tool.human_cost
 
         if self.upload_on_the_go:
             pd.DataFrame.from_dict([result]).to_sql("results", self.engine, if_exists='append', index=False)

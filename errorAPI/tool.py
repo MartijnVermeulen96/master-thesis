@@ -32,6 +32,10 @@ class ToolCreator:
 # The abstract Tool class
 # To implement the different error detection tools
 class Tool(ABC):
+    human_interaction = False
+    human_cost = 0
+    human_accuracy = 0.0
+    
     def __init__(self, which_tool, configuration):
         self.which_tool = which_tool
         self.configuration = configuration
