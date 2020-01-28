@@ -18,3 +18,6 @@
 [submodule "dBoost"]
 	path = errorAPI/tools/dBoost/dBoost
 	url = https://github.com/MartijnVermeulen96/dBoost
+[submodule "errorAPI/helpers/autofd/FDTool"]
+	path = errorAPI/helpers/autofd/FDTool
+	url = https://github.com/Devilmoon/FDTool/

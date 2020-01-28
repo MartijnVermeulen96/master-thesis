@@ -1,24 +1,43 @@
 from errorAPI.tool import Tool
+from ...helpers import AutoFD
 
 class FDchecker(Tool):
-    default_configuration = {}
+    default_configuration = {"Auto": "FDTool"}
     def __init__(self, configuration):
         print("Creating FDchecker")
         super().__init__("FDchecker", configuration)
 
     def run(self, d):
         outputted_cells = {}
-        for l_attribute, r_attribute in self.configuration:
-            jl = d.dataframe.columns.get_loc(l_attribute)
+        if "FDs" in self.configuration:
+            fds = self.configuration["FDs"]
+        else:
+            fds = []
+
+        if "Auto" in self.configuration:
+            autofd_helper = AutoFD(self.configuration["Auto"])
+            
+            fds_auto = autofd_helper.run(d)
+            fds.extend(fds_auto)
+        
+        for l_attribute, r_attribute in fds:
+            # jl = d.dataframe.columns.get_loc(l_attribute)
             jr = d.dataframe.columns.get_loc(r_attribute)
             value_dictionary = {}
+            if isinstance(l_attribute, str):
+                l_attribute = (l_attribute)
+
             for i, row in d.dataframe.iterrows():
-                if row[l_attribute] not in value_dictionary:
-                    value_dictionary[row[l_attribute]] = {}
-                value_dictionary[row[l_attribute]][row[r_attribute]] = 1
+                row_val = tuple(row[col] for col in l_attribute)
+                
+                if row_val not in value_dictionary:
+                    value_dictionary[row_val] = {}
+                value_dictionary[row_val][row[r_attribute]] = 1
+
             for i, row in d.dataframe.iterrows():
-                if len(value_dictionary[row[l_attribute]]) > 1:
-                    outputted_cells[(i, jl)] = ""
-                    outputted_cells[(i, jr)] = ""
+                row_val = tuple(row[col] for col in l_attribute)
+                if len(value_dictionary[row_val]) > 1:
+                    # outputted_cells[(i, jl)] = ""
+                    outputted_cells[(i, jr)] = 
 
         return outputted_cells

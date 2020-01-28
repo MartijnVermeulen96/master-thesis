@@ -57,6 +57,26 @@ class Dataset:
         results_df.to_sql('datasets', engine, if_exists='append')
         print("Succesfully appended the dataset information (Please remove old dataset info manually)")
 
+    @staticmethod
+    def print_scores(d, results):
+        scores = d.evaluate_data_cleaning(results)
+        prec = scores[0]
+        rec = scores[1]
+        f1 = scores[2]
+        
+        cprec = prec
+        crec = rec
+        cf1 = f1
+
+        print("Cell Score:\t Precision=" + str(prec) + "\t Recall=" + str(rec) + "\t F1="+str(f1))
+
+        scores = d.evaluate_detection_row_wise(results)
+        prec = scores[0]
+        rec = scores[1]
+        f1 = scores[2]
+        print("Row Score:\t Precision=" + str(prec) + "\t Recall=" + str(rec) + "\t F1="+str(f1))
+        
+        return (cprec, crec, cf1, prec, rec, f1)
 
 
     def __init__(self, dataset_dictionary):

@@ -1,5 +1,6 @@
 # Basic tool imports
 from errorAPI.tool import Tool
+from errorAPI import default_placeholder
 from typing import Type
 from errorAPI.dataset import Dataset
 import contextlib
@@ -56,7 +57,7 @@ class FAHES(Tool):
 
 
         outlier_cells = {}
-        to_replace = "JUST A DUMMY VALUE"
+        to_replace = default_placeholder
 
         for index, row in DMVs.iterrows():
             col_num = list(dataset.dataframe.columns).index(row["Attribute Name"])

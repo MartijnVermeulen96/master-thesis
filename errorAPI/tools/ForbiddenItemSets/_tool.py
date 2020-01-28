@@ -1,5 +1,6 @@
 # Basic tool imports
 from errorAPI.tool import Tool
+from errorAPI import default_placeholder
 from typing import Type
 from errorAPI.dataset import Dataset
 import contextlib
@@ -72,5 +73,5 @@ class ForbiddenItemSets(Tool):
             for col in cols:
                 numcol = list(dataset.dataframe.columns).index(col)
                 for i in row_list:
-                    outlier_cells[(i, numcol)] = "JUST A DUMMY VALUE"
+                    outlier_cells[(i, numcol)] = default_placeholder
         return outlier_cells
