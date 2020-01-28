@@ -16,6 +16,7 @@ REGISTERED_MODELS = models.ALL()
 REGISTERED_ANALYZERS = analyzers.ALL()
 
 import pandas as pd
+import numpy as np
 import hashlib
 import os
 import itertools
@@ -27,7 +28,9 @@ class dBoost(Tool):
     example_configurations = [{"Params" : list(a)} for a in
                         list(itertools.product(["histogram"], ["0.1", "0.3", "0.5", "0.7", "0.9"],
                                                ["0.1", "0.3", "0.5", "0.7", "0.9"])) +
-                        list(itertools.product(["gaussian"], ["1.0", "1.3", "1.5", "1.7", "2.0", "2.3", "2.5", "2.7", "3.0"]))]
+                        list(itertools.product(["gaussian"],["%.2f" % x for x in np.linspace(0.1,5, 11)]))+
+
+                        list(itertools.product(["mixture"], ["1", "2", "3"], ["0.05", "0.1","0.15","0.2","0.3", "0.4", "0.5", "0.7"]))]
 
     def __init__(self, configuration):
         print("Creating dBoost")

@@ -97,9 +97,6 @@ class Experiment:
         result["human_cost"] = tool.human_cost
         result["human_accuracy"] = tool.human_accuracy
 
-        # Data quality
-        result["data_quality"]
-
         if self.upload_on_the_go:
             pd.DataFrame.from_dict([result]).to_sql("results", self.engine, if_exists='append', index=False)
             
