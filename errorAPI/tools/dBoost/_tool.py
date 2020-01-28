@@ -11,7 +11,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'dBoost/'))
 import dboost
 from dboost import features, analyzers, models, cli
 from dboost.utils.read import stream_tuples
-from dboost.utils.printing import print_rows, debug
+from dboost.utils.printing import print_rows, debug, expand_hints
 REGISTERED_MODELS = models.ALL()
 REGISTERED_ANALYZERS = analyzers.ALL()
 
@@ -38,8 +38,9 @@ class dBoost(Tool):
     def help(self):
         print("Configuration arguments:")
         print("Examples: ")
-        print('["gaussian","1.5"]')
-        print('["histogram", "1.5", "2.0"]')
+        print('{"Params": ["gaussian","1.5"]}')
+        print('{"Params": ["histogram", "1.5", "2.0"]}')
+        print('{"Params": ["mixture", "2", "0.3"]}')
     
     def parser(self, parser, args):
         args = parser.parse_args(args)
@@ -89,8 +90,10 @@ class dBoost(Tool):
                                             analyzer, model, rules,args.runtime_progress, args.maxrecords))   # outliers is defined in __init__.py
 
                 for linum, (x, X, discrepancies) in results:
-                    for dis in discrepancies:
-                        outlier_cells[(linum, dis[0][0] - 1)] = "JUST A DUMMY VALUE"
+                    highlight = set([field_id for fields_group in discrepancies
+                              for field_id, _ in expand_hints(fields_group, analyzer.hints)])
+                    for col in highlight:
+                        outlier_cells[(linum, col)] = "JUST A DUMMY VALUE"
         
         try:
             os.remove(dataset_path)

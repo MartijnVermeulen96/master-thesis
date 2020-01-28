@@ -14,6 +14,7 @@ import sys
 import itertools
 import pandas
 import os
+from sqlalchemy import create_engine
 ########################################
 
 
@@ -25,6 +26,37 @@ class Dataset:
     @staticmethod
     def list_datasets(directory='datasets'):
         return os.listdir(directory)
+
+    @staticmethod
+    def upload_info(sql_string='', directory='datasets'):
+        engine = create_engine(sql_string)
+
+        all_datasets = os.listdir(directory)
+        results_list = []
+        for ds in all_datasets:
+            print("Loading", ds)
+            data_dir = {}
+            dataset_dictionary = {
+                "name": ds,
+            }
+            d = Dataset(dataset_dictionary)
+            num_rows = len(d.dataframe)
+            num_columns = len(d.dataframe.columns)
+            data_quality = d.get_data_quality()
+
+            results_list.append(
+                {
+                    "name": ds,
+                    "data_quality": data_quality,
+                    "num_rows": num_rows,
+                    "num_columns": num_columns
+                }
+            )
+        
+        results_df = pandas.DataFrame.from_dict(results_list)
+        results_df.to_sql('datasets', engine, if_exists='append')
+        print("Succesfully appended the dataset information (Please remove old dataset info manually)")
+
 
 
     def __init__(self, dataset_dictionary):

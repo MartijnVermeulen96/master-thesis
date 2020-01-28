@@ -9,9 +9,6 @@ from datetime import datetime
 import contextlib
 
 class Experiment:
-    results_columns = ["started_at", "runtime", "dataset", "tool_name", "tool_configuration", "human_interaction",
-                       "human_cost", "cell_acc", "cell_rec", "cell_prec", "cell_f1", "row_acc", "row_rec", "row_prec", "row_f1", "error", "error_text"]
-
     def __init__(self, datasets=None, tools=None, tool_configurations={}, sql_string="", upload_on_the_go=True):
         self.upload_on_the_go = upload_on_the_go
         self.tool_creator = ToolCreator()
@@ -98,6 +95,10 @@ class Experiment:
         # Human cost
         result["human_interaction"] = tool.human_interaction
         result["human_cost"] = tool.human_cost
+        result["human_accuracy"] = tool.human_accuracy
+
+        # Data quality
+        result["data_quality"]
 
         if self.upload_on_the_go:
             pd.DataFrame.from_dict([result]).to_sql("results", self.engine, if_exists='append', index=False)
