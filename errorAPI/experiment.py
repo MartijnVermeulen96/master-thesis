@@ -86,11 +86,13 @@ class Experiment:
         result["row_prec"] = scores[0]
         result["row_rec"] = scores[1]
         result["row_f1"] = scores[2]
+        result["row_acc"] = scores[3]
 
         scores = d.evaluate_data_cleaning(results)
         result["cell_prec"] = scores[0]
         result["cell_rec"] = scores[1]
         result["cell_f1"] = scores[2]
+        result["cell_acc"] = scores[3]
 
         # Human cost
         result["human_interaction"] = tool.human_interaction

@@ -79,10 +79,13 @@ class Dataset:
         return (cprec, crec, cf1, prec, rec, f1)
 
 
-    def __init__(self, dataset_dictionary):
+    def __init__(self, dataset_dictionary, calculate_actual_errors=True):
         """
         The constructor creates a dataset.
         """
+        if isinstance(dataset_dictionary, str):
+            dataset_dictionary = {"name": dataset_dictionary}
+
         self.name = dataset_dictionary["name"]
         if "path" not in dataset_dictionary:
             dataset_dictionary["path"] = "datasets/" + dataset_dictionary["name"] + "/dirty.csv"
@@ -94,12 +97,16 @@ class Dataset:
             self.clean_dataframe = self.read_csv_dataset(dataset_dictionary["clean_path"])
             if self.dataframe.shape != self.clean_dataframe.shape:
                 sys.stderr.write("Ground truth is not in the equal size to the dataset!\n")
-            self.actual_errors_dictionary = self.get_actual_errors_dictionary()
+
+            if calculate_actual_errors:
+                self.actual_errors_dictionary = self.get_actual_errors_dictionary()
         if "repaired_path" in dataset_dictionary:
             self.repaired_dataframe = self.read_csv_dataset(dataset_dictionary["repaired_path"])
             if self.dataframe.shape != self.repaired_dataframe.shape:
                 sys.stderr.write("Repaired dataset is not in the equal size to the dataset!\n")
-            self.repairs_dictionary = self.get_repairs_dictionary()
+
+            if calculate_actual_errors:
+                self.repairs_dictionary = self.get_repairs_dictionary()
     
             
             if self.dataframe.shape != self.clean_dataframe.shape:
@@ -172,13 +179,29 @@ class Dataset:
                     ed_tp += 1.0
                     if correction_dictionary[cell] == actual_errors[cell]:
                         ec_tp += 1.0
+
+        
+        total_cells = self.dataframe.shape[0] * self.dataframe.shape[1]
+
+        # total_cells = ed_tp + ed_tn + ed_fp + ed_fn
+        
+        ed_fp = output_size - ed_tp
+        ed_fn = len(actual_errors) - ed_tp
+        ed_tn = total_cells - ed_tp - ed_fp - ed_fn
+        ed_a = (ed_tp + ed_tn) / total_cells
+        
+        ec_fp = output_size - ec_tp
+        ec_fn = len(actual_errors) - ec_tp
+        ec_tn = total_cells - ec_tp - ec_fp - ec_fn
+        ec_a = (ec_tp + ec_tn) / total_cells
+        
         ed_p = 0.0 if output_size == 0 else ed_tp / output_size
         ed_r = 0.0 if len(actual_errors) == 0 else ed_tp / len(actual_errors)
         ed_f = 0.0 if (ed_p + ed_r) == 0.0 else (2 * ed_p * ed_r) / (ed_p + ed_r)
         ec_p = 0.0 if output_size == 0 else ec_tp / output_size
         ec_r = 0.0 if len(actual_errors) == 0 else ec_tp / len(actual_errors)
         ec_f = 0.0 if (ec_p + ec_r) == 0.0 else (2 * ec_p * ec_r) / (ec_p + ec_r)
-        return [ed_p, ed_r, ed_f, ec_p, ec_r, ec_f]
+        return [ed_p, ed_r, ed_f, ed_a, ec_p, ec_r, ec_f, ec_a]
 
 
     def evaluate_detection_row_wise(self, correction_dictionary, sampled_rows_dictionary=False):
@@ -195,20 +218,27 @@ class Dataset:
         actual_error_rows = set()
         for detection in actual_errors:
             actual_error_rows.add(detection[0])
-        
+
         found_error_rows = set()
         for detection in correction_dictionary:
             found_error_rows.add(detection[0])
-        
+
         for found_row in found_error_rows:
             output_size += 1
             if found_row in actual_error_rows:
                 ed_tp += 1.0
 
+        total_rows = len(self.dataframe)
+        ed_fp = output_size - ed_tp
+        ed_fn = len(actual_error_rows) - ed_tp
+        ed_tn = total_rows - ed_tp - ed_fp - ed_fn
+        ed_a = (ed_tp + ed_tn) / total_rows
+
         ed_p = 0.0 if output_size == 0 else ed_tp / output_size
-        ed_r = 0.0 if len(actual_errors) == 0 else ed_tp / len(actual_errors)
+        ed_r = 0.0 if len(actual_errors) == 0 else ed_tp / len(actual_error_rows)
         ed_f = 0.0 if (ed_p + ed_r) == 0.0 else (2 * ed_p * ed_r) / (ed_p + ed_r)
-        return [ed_p, ed_r, ed_f]
+        
+        return [ed_p, ed_r, ed_f, ed_a]
 ########################################
 
 
