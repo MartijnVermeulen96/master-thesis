@@ -16,7 +16,6 @@ class Raha(Tool):
     example_configurations = [{}]
     
     def __init__(self, configuration):
-        print("Creating Raha")
         if configuration == []:
             configuration = self.default_configuration
 

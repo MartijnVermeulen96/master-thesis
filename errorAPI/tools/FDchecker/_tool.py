@@ -1,10 +1,10 @@
 from errorAPI.tool import Tool
 from ...helpers import AutoFD
+from ... import default_placeholder
 
 class FDchecker(Tool):
     default_configuration = {"Auto": "FDTool"}
     def __init__(self, configuration):
-        print("Creating FDchecker")
         super().__init__("FDchecker", configuration)
 
     def run(self, d):
@@ -38,6 +38,6 @@ class FDchecker(Tool):
                 row_val = tuple(row[col] for col in l_attribute)
                 if len(value_dictionary[row_val]) > 1:
                     # outputted_cells[(i, jl)] = ""
-                    outputted_cells[(i, jr)] = 
+                    outputted_cells[(i, jr)] = default_placeholder
 
         return outputted_cells

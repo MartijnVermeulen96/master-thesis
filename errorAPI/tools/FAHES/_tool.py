@@ -18,7 +18,6 @@ class FAHES(Tool):
     default_configuration = {"Algo": 4, "AllMissing": False}
     example_configurations = [{"Algo" : a, "AllMissing": False} for a in range(1,5)]
     def __init__(self, configuration):
-        print("Creating FAHES")
         if configuration == {}:
             configuration = self.default_configuration
         FAHES_src_dir = os.path.dirname(os.path.realpath(__file__)) + '/FAHES_Code/src/'

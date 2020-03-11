@@ -1,5 +1,6 @@
 # Basic tool imports
 from errorAPI.tool import Tool
+from errorAPI import default_placeholder
 from typing import Type
 from errorAPI.dataset import Dataset
 import contextlib
@@ -33,7 +34,6 @@ class dBoost(Tool):
                         list(itertools.product(["mixture"], ["1", "2", "3"], ["0.05", "0.1","0.15","0.2","0.3", "0.4", "0.5", "0.7"]))]
 
     def __init__(self, configuration):
-        print("Creating dBoost")
         if configuration == []:
             configuration = self.default_configuration
         super().__init__("dBoost", configuration)
@@ -96,7 +96,7 @@ class dBoost(Tool):
                     highlight = set([field_id for fields_group in discrepancies
                               for field_id, _ in expand_hints(fields_group, analyzer.hints)])
                     for col in highlight:
-                        outlier_cells[(linum, col)] = "JUST A DUMMY VALUE"
+                        outlier_cells[(linum, col)] = default_placeholder
         
         try:
             os.remove(dataset_path)

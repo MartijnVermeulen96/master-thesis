@@ -19,7 +19,6 @@ class ForbiddenItemSets(Tool):
     example_configurations = [{"Tau" : x} for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]]
 
     def __init__(self, configuration):
-        print("Creating ForbiddenItemSets")
         if configuration == {}:
             configuration = self.default_configuration
         FBI_path_dir = os.path.dirname(os.path.realpath(__file__)) + '/fbiminer/'
