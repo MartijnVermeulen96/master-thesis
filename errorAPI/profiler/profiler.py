@@ -7,11 +7,14 @@ import nltk
 import re
 import operator
 import string
+import traceback
+import math
 
 from sklearn.pipeline import Pipeline
 from sklearn.base import clone
 from sklearn.preprocessing import Normalizer
 from sklearn.decomposition import PCA
+from sklearn.feature_selection import VarianceThreshold, SelectFromModel, SelectKBest, f_regression, chi2
 
 class Profiler():
     available_regressors = [
@@ -25,33 +28,40 @@ class Profiler():
         "ABR",
         "MLR"
     ]
-    def __init__(self, which_regressor=None, normalize=True, pca=-1):
+    def __init__(self, which_regressor=None, normalize=True, pca=-1, feature_selection=None, extra_options={}):
         if which_regressor is not None:
             self.which_regressor = which_regressor
 
         self.pca = pca
         self.normalize = normalize
+        self.feature_selection = feature_selection        
+        
+        self.extra_options = extra_options
+
         self.init_regressor()
+
 
     def init_regressor(self):
         if self.which_regressor == "LR":
-            regressor = sklearn.linear_model.LinearRegression(normalize=True)
+            regressor = sklearn.linear_model.LinearRegression(**self.extra_options)
         elif self.which_regressor == "KNR":
-            regressor = sklearn.neighbors.KNeighborsRegressor(n_neighbors=5)
+            if "n_neighbors" not in self.extra_options:
+                self.extra_options["n_neighbors"] = 3
+            regressor = sklearn.neighbors.KNeighborsRegressor(**self.extra_options)
         elif self.which_regressor == "RR":
-            regressor = sklearn.linear_model.Ridge(alpha=0.04, normalize=True)
+            regressor = sklearn.linear_model.Ridge(**self.extra_options)
         elif self.which_regressor == "BRR":
-            regressor = sklearn.linear_model.BayesianRidge(normalize=False)
+            regressor = sklearn.linear_model.BayesianRidge(**self.extra_options)
         elif self.which_regressor == "DTR":
-            regressor = sklearn.tree.DecisionTreeRegressor(criterion="mae")
+            regressor = sklearn.tree.DecisionTreeRegressor(**self.extra_options)
         elif self.which_regressor == "SVR":
-            regressor = sklearn.svm.SVR(kernel="rbf")
+            regressor = sklearn.svm.SVR(**self.extra_options)
         elif self.which_regressor == "GBR":
-            regressor = sklearn.ensemble.GradientBoostingRegressor(loss="lad", n_estimators=100)
+            regressor = sklearn.ensemble.GradientBoostingRegressor(**self.extra_options)
         elif self.which_regressor == "ABR":
-            regressor = sklearn.ensemble.AdaBoostRegressor()
+            regressor = sklearn.ensemble.AdaBoostRegressor(**self.extra_options)
         elif self.which_regressor == "MLR":
-            regressor = sklearn.neural_network.MLPRegressor(hidden_layer_sizes=(30, 30), max_iter=500)
+            regressor = sklearn.neural_network.MLPRegressor(**self.extra_options)
 
         if self.normalize:
             norm = Normalizer()
@@ -63,9 +73,20 @@ class Profiler():
         else:
            pca = None 
 
+
+        feature_selection = None
+        if self.feature_selection is not None:
+            if "VarianceThreshold" in self.feature_selection:
+                feature_selection = VarianceThreshold(float(self.feature_selection.split("_")[1]))
+            if self.feature_selection == "SelectFromModel":
+                feature_selection = SelectFromModel(regressor)
+            if "SelectKBest" in self.feature_selection:
+                feature_selection = SelectKBest(score_func=f_regression, k=int(self.feature_selection.split("_")[1]))
+
         self.model = Pipeline(
             [
                 ('Normalizer', norm), 
+                ('Feature selection', feature_selection),
                 ("PCA", pca), 
                 ("Regressor", regressor)
             ]
@@ -90,10 +111,13 @@ class Profiler():
         return x, y, labels, merged_results
 
     def leave_one_out(self, x, y, model):
+        if len(y) == 0:
+            return [], None
+        
         pred_vals = []
         for i in range(len(y)):
-            x_new = x.iloc[pd.np.r_[:i, i+1:len(x)]]
-            y_new = y.iloc[pd.np.r_[:i, i+1:len(y)]]
+            x_new = x.iloc[np.r_[:i, i+1:len(x)]]
+            y_new = y.iloc[np.r_[:i, i+1:len(y)]]
             trained_model = clone(model).fit(x_new, y_new)
             pred_val = trained_model.predict(np.array(x.iloc[i]).reshape(1, -1))[0]
             pred_val = max(pred_val, 0)
@@ -108,22 +132,27 @@ class Profiler():
     def train_all_configs(self, configs, data_profiles, performance_data, metric="cell_f1"):
         try:
             for tool_key in configs:
-                x, y, labels, merged_results = self.get_training_data(tool_key, data_profiles, performance_data, metric)
+                try:
+                    x, y, labels, merged_results = self.get_training_data(tool_key, data_profiles, performance_data, metric)
 
-                pred_vals, trained_model = self.leave_one_out(x, y, clone(self.model))
-                self.trained_models[tool_key] = trained_model
+                    pred_vals, trained_model = self.leave_one_out(x, y, clone(self.model))
+                    self.trained_models[tool_key] = trained_model
 
-                self.estimation_performance = self.estimation_performance.append(pd.Series(dict(zip(labels, list(pred_vals))), name=str(tool_key)))
-                self.real_performance = self.real_performance.append(pd.Series(dict(zip(labels, list(y))), name=str(tool_key)))    
-                
+                    self.estimation_performance = self.estimation_performance.append(pd.Series(dict(zip(labels, list(pred_vals))), name=str(tool_key)))
+                    self.real_performance = self.real_performance.append(pd.Series(dict(zip(labels, list(y))), name=str(tool_key)))    
+                except:
+                    pass
+
             self.errors_estimation = self.estimation_performance - self.real_performance
             self.squared_errors = (self.errors_estimation).applymap(lambda x: x*x)
         except ValueError:
+            traceback.print_exc()
             print("Error training, returning")
 
     def get_MSE(self):
         try:
-            return self.squared_errors.sum().sum()
+            non_nan_values = self.squared_errors.count().sum()
+            return self.squared_errors.sum().sum() / non_nan_values
         except:
             print("Not calculated errors")
             return 999999999
@@ -146,11 +175,83 @@ class Profiler():
             return result.sort_values(ascending=False).head(n)
         return result.sort_values(ascending=False)
 
+    def get_ranking_and_scores(self, dataset_name, number_of_results=5):
+        estimated_performance_top = self.get_top_n_estimated(dataset_name, number_of_results)
+        real_performance_top = self.get_top_n_real(dataset_name, number_of_results)
+
+        estimated_performance_list = list(estimated_performance_top.index)
+        estimated_performance_list.reverse()
+        ranking_results = []
+
+        real_rank = 0
+        for config_key in real_performance_top.index:
+            real_rank += 1
+            if config_key in estimated_performance_list:
+                rel_i = (estimated_performance_list.index(config_key) + 1) / len(estimated_performance_list)
+            else:
+                rel_i = 0
+
+            best_rel_i = (len(real_performance_top) - real_rank + 1) / len(real_performance_top)
+            
+            score = (2**rel_i - 1) / math.log2(real_rank + 1)
+            best_score = (2**best_rel_i - 1) / math.log2(real_rank + 1)
+            
+            ranking_results.append({"config": config_key, "rel_i": rel_i, "best_rel": best_rel_i, "real_rank": real_rank, "score": score, "best_score": best_score})
+
+        ranking_df = pd.DataFrame(ranking_results)
+        dcg_rank = ranking_df["score"].sum()
+        idcg_rank = ranking_df["best_score"].sum()
+        ndcg_rank = dcg_rank / idcg_rank
+
+        return ranking_df, dcg_rank, ndcg_rank
+
+    def batch_ranking_scores(self, dataset_names, number_of_results=10):
+        rank_scores = []
+        for dataset_name in dataset_names:
+            try:
+                ranking_df, dcg_rank, ndcg_rank = self.get_ranking_and_scores(dataset_name, number_of_results)
+                rank_scores.append({"dataset": dataset_name, "DCG": dcg_rank, "nDCG": ndcg_rank})
+            except KeyError:
+                pass
+        
+        if len(rank_scores) == 0:
+            return None, -1, -1
+
+        total_ranking_scores_df = pd.DataFrame(rank_scores)
+        ndcg_sum = total_ranking_scores_df["nDCG"].sum()
+        ndcg_std = total_ranking_scores_df["nDCG"].std()
+
+        return total_ranking_scores_df, ndcg_sum, ndcg_std
+
     @staticmethod
     def dataset_profiler(d: Type[Dataset], KEYWORDS_COUNT_PER_COLUMN=10):
         """
         This method profiles the dataset.
         """
+
+        measures=["mean", "max", "min", "variance"]
+        inputs = [
+                "characters_unique",
+                "characters_alphabet",
+                "characters_numeric",
+                "characters_punctuation",
+                "characters_miscellaneous",
+                "words_unique",
+                "words_alphabet",
+                "words_numeric",
+                "words_punctuation",
+                "words_miscellaneous",
+                "words_length",
+                "cells_unique",
+                "cells_alphabet",
+                "cells_numeric",
+                "cells_punctuation",
+                "cells_miscellaneous",
+                "cells_length",
+                "cells_null"
+            ]
+
+
         print("Profiling dataset {}...".format(d.name))
         characters_unique_list = [0.0] * d.dataframe.shape[1]
         characters_alphabet_list = [0.0] * d.dataframe.shape[1]
@@ -231,48 +332,24 @@ class Profiler():
                 if keyword not in stop_words_set:
                     top_keywords_dictionary[keyword] = float(frequency) / d.dataframe.shape[0]
 
-        def f(columns_value_list):
-            return np.mean(np.array(columns_value_list).astype(np.float) / d.dataframe.shape[0])
+        def calc_mean(columns_value_list):
+            return np.mean(columns_value_list).astype(np.float)
 
-        def g(columns_value_list):
-            return np.var(np.array(columns_value_list).astype(np.float) / d.dataframe.shape[0])
+        def calc_variance(columns_value_list):
+            return np.var(columns_value_list).astype(np.float)
+            
+        def calc_min(columns_value_list):
+            return min(columns_value_list)
 
-        dataset_profile = {
-            "characters_unique_mean": f(characters_unique_list),
-            "characters_unique_variance": g(characters_unique_list),
-            "characters_alphabet_mean": f(characters_alphabet_list),
-            "characters_alphabet_variance": g(characters_alphabet_list),
-            "characters_numeric_mean": f(characters_numeric_list),
-            "characters_numeric_variance": g(characters_numeric_list),
-            "characters_punctuation_mean": f(characters_punctuation_list),
-            "characters_punctuation_variance": g(characters_punctuation_list),
-            "characters_miscellaneous_mean": f(characters_miscellaneous_list),
-            "characters_miscellaneous_variance": g(characters_miscellaneous_list),
-            "words_unique_mean": f(words_unique_list),
-            "words_unique_variance": g(words_unique_list),
-            "words_alphabet_mean": f(words_alphabet_list),
-            "words_alphabet_variance": g(words_alphabet_list),
-            "words_numeric_mean": f(words_numeric_list),
-            "words_numeric_variance": g(words_numeric_list),
-            "words_punctuation_mean": f(words_punctuation_list),
-            "words_punctuation_variance": g(words_punctuation_list),
-            "words_miscellaneous_mean": f(words_miscellaneous_list),
-            "words_miscellaneous_variance": g(words_miscellaneous_list),
-            "words_length_mean": f(words_length_list),
-            "words_length_variance": g(words_length_list),
-            "cells_unique_mean": f(cells_unique_list),
-            "cells_unique_variance": g(cells_unique_list),
-            "cells_alphabet_mean": f(cells_alphabet_list),
-            "cells_alphabet_variance": g(cells_alphabet_list),
-            "cells_numeric_mean": f(cells_numeric_list),
-            "cells_numeric_variance": g(cells_numeric_list),
-            "cells_punctuation_mean": f(cells_punctuation_list),
-            "cells_punctuation_variance": g(cells_punctuation_list),
-            "cells_miscellaneous_mean": f(cells_miscellaneous_list),
-            "cells_miscellaneous_variance": g(cells_miscellaneous_list),
-            "cells_length_mean": f(cells_length_list),
-            "cells_length_variance": g(cells_length_list),
-            "cells_null_mean": f(cells_null_list),
-            "cells_null_variance": g(cells_null_list)
-        }
+        def calc_max(columns_value_list):
+            return max(columns_value_list)
+
+        dataset_profile = {}
+
+        labels = []
+
+        for input_var in inputs:
+            for measure in measures:
+                labels.append(input_var + "_" + measure)
+                dataset_profile[input_var + "_" + measure] = eval("calc_" + measure + "(" + input_var + "_list)")
         return dataset_profile

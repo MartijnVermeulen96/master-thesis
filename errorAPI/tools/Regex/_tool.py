@@ -3,6 +3,7 @@ import re
 
 class Regex(Tool):
     default_configuration = {}
+    example_configurations = []
     def __init__(self, configuration):
         super().__init__("Regex", configuration)
 

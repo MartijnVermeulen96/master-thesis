@@ -9,11 +9,25 @@ import os
 # Import the newest Raha
 sys.path.append(os.path.join(os.path.dirname(__file__), 'raha/'))
 import raha
+import itertools
+ERROR_DETECTION_ALGORITHMS = [
+    ['OD', 'PVD', 'RVD', 'KBVD'],
+    ['OD', 'PVD', 'RVD', 'KBVD', 'TFIDF']
+]
 
+CLASSIFICATION_MODEL = ["ABC", "DTC", "GBC", "GNB", "SGDC", "SVC"]
+LABELING_BUDGETS = [
+        {"LABELING_BUDGET": 0, "CLUSTERING_BASED_SAMPLING": False},
+        {"LABELING_BUDGET": 10},
+        {"LABELING_BUDGET": 20},
+]
+labels = ["ERROR_DETECTION_ALGORITHMS", "CLASSIFICATION_MODEL"]
 
 class Raha(Tool):
     default_configuration = {}
-    example_configurations = [{}]
+    
+    example_configurations = [dict(**a, **b) for (a, b) in itertools.product(LABELING_BUDGETS, 
+        [dict(zip(labels, x)) for x in itertools.product(ERROR_DETECTION_ALGORITHMS, CLASSIFICATION_MODEL)])]
     
     def __init__(self, configuration):
         if configuration == []:

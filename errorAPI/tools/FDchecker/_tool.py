@@ -4,6 +4,8 @@ from ... import default_placeholder
 
 class FDchecker(Tool):
     default_configuration = {"Auto": "FDTool"}
+    example_configurations = []
+    
     def __init__(self, configuration):
         super().__init__("FDchecker", configuration)
 

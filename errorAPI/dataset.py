@@ -12,6 +12,7 @@
 ########################################
 import sys
 import itertools
+import numpy as np
 import pandas
 import os
 from sqlalchemy import create_engine
@@ -98,6 +99,7 @@ class Dataset:
             if self.dataframe.shape != self.clean_dataframe.shape:
                 sys.stderr.write("Ground truth is not in the equal size to the dataset!\n")
 
+            self.clean_dataframe.columns = self.dataframe.columns
             if calculate_actual_errors:
                 self.actual_errors_dictionary = self.get_actual_errors_dictionary()
         if "repaired_path" in dataset_dictionary:
@@ -105,13 +107,15 @@ class Dataset:
             if self.dataframe.shape != self.repaired_dataframe.shape:
                 sys.stderr.write("Repaired dataset is not in the equal size to the dataset!\n")
 
+            self.repaired_dataframe.columns = self.dataframe.columns
+
             if calculate_actual_errors:
                 self.repairs_dictionary = self.get_repairs_dictionary()
+                self.actual_errors_dictionary = self.get_actual_errors_dictionary()
     
             
             if self.dataframe.shape != self.clean_dataframe.shape:
                 sys.stderr.write("Ground truth is not in the equal size to the dataset!\n")
-            self.actual_errors_dictionary = self.get_actual_errors_dictionary()
 
     def read_csv_dataset(self, dataset_path):
         """
@@ -131,9 +135,8 @@ class Dataset:
         """
         This method compares the clean and dirty versions of a dataset.
         """
-        return {(i, j): self.clean_dataframe.iloc[i, j]
-                for (i, j) in itertools.product(range(self.dataframe.shape[0]), range(self.dataframe.shape[1]))
-                if self.dataframe.iloc[i, j] != self.clean_dataframe.iloc[i, j]}
+        indices = np.where(self.dataframe.ne(self.clean_dataframe))
+        return {(y, x): self.clean_dataframe.iloc[y, x] for (y, x) in zip(indices[0], indices[1])}
 
     def create_repaired_dataset(self, correction_dictionary):
         """
