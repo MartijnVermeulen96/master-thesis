@@ -6,6 +6,8 @@
 # Big Data Management Group
 # TU Berlin
 # All Rights Reserved
+#
+# Changes made by Martijn Vermeulen 2020
 ########################################
 
 
