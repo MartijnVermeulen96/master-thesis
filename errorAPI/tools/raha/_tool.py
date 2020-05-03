@@ -42,7 +42,7 @@ class Raha(Tool):
         # Human cost
         self.human_cost = self.detection.LABELING_BUDGET
         self.human_accuracy = self.detection.USER_LABELING_ACCURACY
-        self.human_interaction = True
+        self.human_interaction = self.detection.CLUSTERING_BASED_SAMPLING
         
 
         super().__init__("Raha", configuration)

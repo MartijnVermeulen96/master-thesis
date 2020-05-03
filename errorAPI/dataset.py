@@ -140,6 +140,13 @@ class Dataset:
         indices = np.where(self.dataframe.ne(self.clean_dataframe))
         return {(y, x): self.clean_dataframe.iloc[y, x] for (y, x) in zip(indices[0], indices[1])}
 
+    def get_clean_to_dirty_dictionary(self):
+        """
+        This method compares the clean and dirty versions of a dataset, but the other way around.
+        """
+        indices = np.where(self.clean_dataframe.ne(self.dataframe))
+        return {(y, x): self.dataframe.iloc[y, x] for (y, x) in zip(indices[0], indices[1])}
+
     def create_repaired_dataset(self, correction_dictionary):
         """
         This method takes the dictionary of corrected values and creates the repaired dataset.
