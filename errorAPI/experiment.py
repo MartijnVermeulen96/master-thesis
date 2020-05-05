@@ -1,6 +1,5 @@
 from .dataset import Dataset
 from .tool import ToolCreator
-from .helpers import ProcessKillingExecutor
 
 import os
 import pandas as pd
@@ -9,9 +8,10 @@ from sqlalchemy import create_engine
 from datetime import datetime
 import contextlib
 import pickle
-import pickle
 import collections
 from collections import deque
+import traceback
+from concurrent.futures import TimeoutError
 
 class Experiment:
     def __init__(self, datasets=None, tools=None, tool_configurations={}, sql_string="", upload_on_the_go=True, pickle_file="experiments.p", no_print=True, timeout=1800):
@@ -77,15 +77,6 @@ class Experiment:
 
         self.create_results_df()
         print("Done")
-    
-    def execute_with_timeout(self, tool, d):
-        def raise_timeout(n):
-            raise TimeoutError("Timeout " + str(n))
-        
-        executor = ProcessKillingExecutor(max_workers=1)
-        generator = executor.map(tool.run, [d], timeout=self.timeout, callback_timeout=raise_timeout)
-        for elem in generator:
-            return elem
         
     def run_single(self, dataset, tool, tool_config):
         result = {}
@@ -108,13 +99,13 @@ class Experiment:
                 f = open(os.devnull, 'w')
                 with contextlib.redirect_stdout(f):
                     with contextlib.redirect_stderr(f):
-                        results = self.execute_with_timeout(tool, d)
+                        results = tool.run_with_timeout(d, self.timeout)
             else:
-                results = self.execute_with_timeout(tool, d)
+                results = tool.run_with_timeout(d, self.timeout)
             result["error_text"] = ""
             result["error"] = False
-        except TimeoutError:
-            print('Timeout!')
+        except TimeoutError as e:
+            print("Timeout " + str(self.timeout))
             results = {}
             result["error"] = True
             result["error_text"] = "Timeout " + str(self.timeout)
@@ -122,6 +113,10 @@ class Experiment:
             results = {}
             result["error"] = True
             result["error_text"] = str(e)
+            traceback.print_exc()
+        
+        tool.kill_subs()
+        # raise Exception("Quit!")
         result["runtime"] = time.time() - start
 
         scores = d.evaluate_detection_row_wise(results)
