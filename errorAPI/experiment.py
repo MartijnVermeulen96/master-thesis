@@ -11,7 +11,7 @@ import pickle
 import collections
 from collections import deque
 import traceback
-from concurrent.futures import TimeoutError
+from multiprocessing import TimeoutError
 
 class Experiment:
     def __init__(self, datasets=None, tools=None, tool_configurations={}, sql_string="", upload_on_the_go=True, pickle_file="experiments.p", no_print=True, timeout=1800):
@@ -63,13 +63,19 @@ class Experiment:
         print("Running all experiments")
         while len(self.experiments_q) > 0:
             experiment_tuple = self.experiments_q[-1]
-            print("Dataset:", experiment_tuple[0], "- Tool:",
-                  experiment_tuple[1], "- Config:", experiment_tuple[2])
+            print("Dataset: {} - Tool: {} - Config: {}".format(*experiment_tuple))
+            
+            errorset = False
 
-            single_result = self.run_single(
-                experiment_tuple[0], experiment_tuple[1], experiment_tuple[2])
+            try:
+                single_result = self.run_single(*experiment_tuple)
+            except Exception as e:
+                print("Something went wrong before executing the tool")
+                print(e)
+                errorset = True
 
-            self.results.append(single_result)
+            if not errorset:
+                self.results.append(single_result)
 
             self.experiments_q.pop()
             self.experiments_done.append(experiment_tuple)
@@ -148,13 +154,16 @@ class Experiment:
                                if_exists='append', index=False)
 
     @staticmethod
-    def create_example_configs(sql_string, datasets=None):
+    def create_example_configs(sql_string, datasets=None, tools=None):
         if datasets is None:
             datasets = Dataset.list_datasets()
         tool_creator = ToolCreator()
-        all_tools = tool_creator.list_tools()
         tool_configs = {}
-        for tool in all_tools:
+
+        if tools is None:
+            tools = tool_creator.list_tools()
+
+        for tool in tools:
             try:
                 tool_configs[tool] = tool_creator.createTool(
                     tool, {}).example_configurations
@@ -162,7 +171,7 @@ class Experiment:
                 tool_configs[tool] = [tool_creator.createTool(
                     tool, {}).default_configuration]
 
-        return Experiment(datasets, all_tools, tool_configs, sql_string)
+        return Experiment(datasets, tools, tool_configs, sql_string)
 
     def save_experiment_state(self):
         to_save_dir = {

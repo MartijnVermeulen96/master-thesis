@@ -45,8 +45,8 @@ class FAHES(Tool):
         
         dataset.write_csv_dataset(dataset_path, dataset.dataframe)
 
-        process = self.FAHES_path + " " + dataset_path + " " + result_path +" " + str(self.configuration["Algo"])
-        os.system(process)
+        process = [self.FAHES_path, dataset_path, result_path, str(self.configuration["Algo"])]
+        self.run_subprocess(process)
 
         try:
             DMVs = pd.read_csv(result_path + "/DMV_" + filename)

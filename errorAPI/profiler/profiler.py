@@ -9,12 +9,90 @@ import operator
 import string
 import traceback
 import math
-
+import seaborn as sns
+from sklearn.preprocessing import FunctionTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.base import clone
-from sklearn.preprocessing import Normalizer
-from sklearn.decomposition import PCA
+from sklearn.preprocessing import Normalizer, StandardScaler
+from sklearn.decomposition import PCA, KernelPCA
 from sklearn.feature_selection import VarianceThreshold, SelectFromModel, SelectKBest, f_regression, chi2
+
+
+def performance_prediction_info(errors_estimation, chosen_metric=""):
+    errors = errors_estimation.values.flatten()
+    x = abs(errors[~np.isnan(errors)])
+
+    mean_squared_error = np.mean(x ** 2)
+    mean_error = np.mean(x)
+    median_error = np.median(x)
+    variance_error = np.var(x)
+    percentile95_error = np.percentile(x, 95)
+
+    title = "-=" * 5 + " Performance estimation " + chosen_metric + "-=" * 5
+    print(title)
+    print()
+    print("Mean square error:\t", "{:.4f}".format(mean_squared_error))
+    print("Mean error:\t\t", "{:.4f}".format(mean_error))
+    print("Median error:\t\t", "{:.4f}".format(median_error))
+    print("Error variance:\t\t", "{:.4f}".format(variance_error))
+    print("95th percentile:\t", "{:.4f}".format(percentile95_error))
+    print()
+    # fig = sns.distplot(errors).set_title('Performance prediction error distribution')
+    # return fig
+    print("-=" * int(len(title) / 2))
+
+
+def extract_K_L_ranking(ranking, K, L, which_metric="Score"):
+    tools_rank = [eval(x)[0] for x in ranking.index]
+    config_rank = [eval(x)[1] for x in ranking.index]
+    vals_rank = [x for x in ranking]
+    ranking_dict = {
+        "Tool": tools_rank,
+        "Config": config_rank,
+        which_metric: vals_rank
+    }
+    ranking_df = pd.DataFrame(ranking_dict)
+    return ranking_df.groupby("Tool").head(L).reset_index(drop=True).head(K)
+
+def get_dcgi(ranking, real_scores):
+    ranking["rel_r"] = ranking.apply(lambda row: real_scores[str((row[0], row[1]))], axis=1)
+    ranking["r"] = range(1, len(ranking) + 1)
+    ranking["dcg_i"] = ranking["rel_r"] / np.log(ranking["r"] + 1)
+    return ranking
+
+class CombinedProfiler():
+    def __init__(self, precision_profiler, recall_profiler, f1_profiler):
+        self.precision_profiler = precision_profiler
+        self.recall_profiler = recall_profiler
+        self.f1_profiler = f1_profiler
+        self.f1_estimation_performance = self.precision_profiler.estimation_performance * \
+            self.recall_profiler.estimation_performance
+
+    def get_real_performance(self, which_metric):
+        if which_metric == "precision":
+            return self.precision_profiler.real_performance
+        elif which_metric == "recall":
+            return self.recall_profiler.real_performance
+        elif which_metric == "f1":
+            return self.f1_profiler.real_performance
+        else:
+            return None
+
+    def get_combined_f1_estimation(self):
+        rec = self.get_estimated_performance("recall")
+        prec = self.get_estimated_performance("precision")
+        return 2 * rec * prec / (rec + prec)
+
+    def get_estimated_performance(self, which_metric):
+        if which_metric == "precision":
+            return self.precision_profiler.estimation_performance
+        elif which_metric == "recall":
+            return self.recall_profiler.estimation_performance
+        elif which_metric == "f1":
+            return self.f1_profiler.estimation_performance
+        else:
+            return None
+
 
 class Profiler():
     available_regressors = [
@@ -28,66 +106,83 @@ class Profiler():
         "ABR",
         "MLR"
     ]
-    def __init__(self, which_regressor=None, normalize=True, pca=-1, feature_selection=None, extra_options={}):
+
+    def __init__(self, which_regressor=None, normalize=None, pca=(None, -1), feature_selection=None, extra_options={}, metric="cell_f1"):
         if which_regressor is not None:
             self.which_regressor = which_regressor
 
-        self.pca = pca
+        self.metric = metric
+
+        self.pca_kernel = pca[0]
+        self.pca_comp = pca[1]
         self.normalize = normalize
-        self.feature_selection = feature_selection        
-        
-        self.extra_options = extra_options
+        self.feature_selection = feature_selection
+        self.extra_options = extra_options.copy()
 
         self.init_regressor()
 
-
     def init_regressor(self):
         if self.which_regressor == "LR":
-            regressor = sklearn.linear_model.LinearRegression(**self.extra_options)
+            regressor = sklearn.linear_model.LinearRegression(
+                **self.extra_options)
         elif self.which_regressor == "KNR":
             if "n_neighbors" not in self.extra_options:
                 self.extra_options["n_neighbors"] = 3
-            regressor = sklearn.neighbors.KNeighborsRegressor(**self.extra_options)
+            regressor = sklearn.neighbors.KNeighborsRegressor(
+                **self.extra_options)
         elif self.which_regressor == "RR":
             regressor = sklearn.linear_model.Ridge(**self.extra_options)
         elif self.which_regressor == "BRR":
-            regressor = sklearn.linear_model.BayesianRidge(**self.extra_options)
+            regressor = sklearn.linear_model.BayesianRidge(
+                **self.extra_options)
         elif self.which_regressor == "DTR":
-            regressor = sklearn.tree.DecisionTreeRegressor(**self.extra_options)
+            regressor = sklearn.tree.DecisionTreeRegressor(
+                **self.extra_options)
         elif self.which_regressor == "SVR":
             regressor = sklearn.svm.SVR(**self.extra_options)
         elif self.which_regressor == "GBR":
-            regressor = sklearn.ensemble.GradientBoostingRegressor(**self.extra_options)
+            regressor = sklearn.ensemble.GradientBoostingRegressor(
+                **self.extra_options)
         elif self.which_regressor == "ABR":
-            regressor = sklearn.ensemble.AdaBoostRegressor(**self.extra_options)
+            regressor = sklearn.ensemble.AdaBoostRegressor(
+                **self.extra_options)
         elif self.which_regressor == "MLR":
-            regressor = sklearn.neural_network.MLPRegressor(**self.extra_options)
+            regressor = sklearn.neural_network.MLPRegressor(
+                **self.extra_options)
 
-        if self.normalize:
-            norm = Normalizer()
-        else:
+        if self.normalize is None:
             norm = None
-
-        if self.pca > 0:
-            pca = PCA(self.pca)
         else:
-           pca = None 
+            if self.normalize == "standard":
+                norm = StandardScaler()
+            else:
+                norm = Normalizer()
 
+        if self.pca_comp > 0:
+            if self.pca_kernel is None:
+                pca = PCA(self.pca_comp)
+            else:
+                pca = KernelPCA(n_components=self.pca_comp,
+                                kernel=self.pca_kernel)
+        else:
+            pca = None
 
         feature_selection = None
         if self.feature_selection is not None:
             if "VarianceThreshold" in self.feature_selection:
-                feature_selection = VarianceThreshold(float(self.feature_selection.split("_")[1]))
+                feature_selection = VarianceThreshold(
+                    float(self.feature_selection.split("_")[1]))
             if self.feature_selection == "SelectFromModel":
                 feature_selection = SelectFromModel(regressor)
             if "SelectKBest" in self.feature_selection:
-                feature_selection = SelectKBest(score_func=f_regression, k=int(self.feature_selection.split("_")[1]))
+                feature_selection = SelectKBest(
+                    score_func=f_regression, k=int(self.feature_selection.split("_")[1]))
 
         self.model = Pipeline(
             [
-                ('Normalizer', norm), 
+                ('Normalizer', norm),
                 ('Feature selection', feature_selection),
-                ("PCA", pca), 
+                ("PCA", pca),
                 ("Regressor", regressor)
             ]
         )
@@ -95,72 +190,107 @@ class Profiler():
         self.estimation_performance = pd.DataFrame()
         self.real_performance = pd.DataFrame()
 
-    
-    def get_training_data(self, tool_key, data_profiles, performance_data, metric="cell_f1"):
+    def get_training_data(self, tool_key, data_profiles, performance_data):
         if tool_key is not None:
-            new_perf = performance_data[(performance_data["tool_name"] == tool_key[0]) & (performance_data["tool_configuration"] == tool_key[1])][["dataset",metric]]
+            new_perf = performance_data[(performance_data["tool_name"] == tool_key[0]) & (
+                performance_data["tool_configuration"] == tool_key[1])][["dataset", self.metric]]
         else:
             new_perf = performance_data
-            
+
         new_perf.columns = ["name", "y"]
         merged_results = new_perf.merge(data_profiles, on="name")
-        x = merged_results.loc[:, (merged_results.columns != 'y') & (merged_results.columns != 'name')]
+        x = merged_results.loc[:, (merged_results.columns != 'y') & (
+            merged_results.columns != 'name')]
         y = merged_results["y"]
         labels = merged_results["name"]
-        
+
         return x, y, labels, merged_results
 
     def leave_one_out(self, x, y, model):
         if len(y) == 0:
             return [], None
-        
+
         pred_vals = []
         for i in range(len(y)):
             x_new = x.iloc[np.r_[:i, i+1:len(x)]]
             y_new = y.iloc[np.r_[:i, i+1:len(y)]]
             trained_model = clone(model).fit(x_new, y_new)
-            pred_val = trained_model.predict(np.array(x.iloc[i]).reshape(1, -1))[0]
-            pred_val = max(pred_val, 0)
-            pred_val = min(pred_val, 1)
-            
-
+            pred_val = np.clip(trained_model.predict(
+                np.array(x.iloc[i]).reshape(1, -1))[0], 0, 1)
             pred_vals.append(pred_val)
-        
+
         trained_model = clone(model).fit(x, y)
         return pred_vals, trained_model
 
-    def train_all_configs(self, configs, data_profiles, performance_data, metric="cell_f1"):
+    def train_all_configs(self, configs, data_profiles, performance_data):
         try:
             for tool_key in configs:
                 try:
-                    x, y, labels, merged_results = self.get_training_data(tool_key, data_profiles, performance_data, metric)
+                    x, y, labels, merged_results = self.get_training_data(
+                        tool_key, data_profiles, performance_data)
 
-                    pred_vals, trained_model = self.leave_one_out(x, y, clone(self.model))
+                    pred_vals, trained_model = self.leave_one_out(
+                        x, y, clone(self.model))
                     self.trained_models[tool_key] = trained_model
 
-                    self.estimation_performance = self.estimation_performance.append(pd.Series(dict(zip(labels, list(pred_vals))), name=str(tool_key)))
-                    self.real_performance = self.real_performance.append(pd.Series(dict(zip(labels, list(y))), name=str(tool_key)))    
-                except:
-                    pass
+                    self.estimation_performance = self.estimation_performance.append(
+                        pd.Series(dict(zip(labels, list(pred_vals))), name=str(tool_key)))
+                    self.real_performance = self.real_performance.append(
+                        pd.Series(dict(zip(labels, list(y))), name=str(tool_key)))
+                except Exception as e:
+                    print(tool_key, "could not be trained")
+                    print(e)
+                    continue
 
             self.errors_estimation = self.estimation_performance - self.real_performance
-            self.squared_errors = (self.errors_estimation).applymap(lambda x: x*x)
+            self.squared_errors = (
+                self.errors_estimation).applymap(lambda x: x*x)
         except ValueError:
             traceback.print_exc()
             print("Error training, returning")
 
-    def get_MSE(self):
+    def get_fitted_results(self, configs, data_profiles, performance_data):
+        if len(self.trained_models) == 0:
+            raise Exception("Please train the models first")
+
+        estimation_performance = pd.DataFrame()
+        real_performance = pd.DataFrame()
+
+        for tool_key in configs:
+            if tool_key not in self.trained_models:
+                print(tool_key, "regressor not trained")
+                continue
+            x, y, labels, merged_results = self.get_training_data(
+                tool_key, data_profiles, performance_data)
+            pred_vals = []
+            for i in range(len(y)):
+                pred_val = np.clip(self.trained_models[tool_key].predict(
+                    np.array(x.iloc[i]).reshape(1, -1))[0], 0, 1)
+                pred_vals.append(pred_val)
+
+            estimation_performance = estimation_performance.append(
+                pd.Series(dict(zip(labels, list(pred_vals))), name=str(tool_key)))
+            real_performance = real_performance.append(
+                pd.Series(dict(zip(labels, list(y))), name=str(tool_key)))
+
+        errors_estimation = estimation_performance - real_performance
+        squared_errors = (errors_estimation).applymap(lambda x: x*x)
+        return estimation_performance, real_performance, errors_estimation, squared_errors
+
+    def get_MSE(self, squared_errors=None):
         try:
-            non_nan_values = self.squared_errors.count().sum()
-            return self.squared_errors.sum().sum() / non_nan_values
+            if squared_errors is None:
+                squared_errors = self.squared_errors
+
+            non_nan_values = squared_errors.count().sum()
+            return squared_errors.sum().sum() / non_nan_values
         except:
             print("Not calculated errors")
             return 999999999
 
-
     def get_top_n_estimated(self, dataset_name, n):
         return self.estimation_performance[dataset_name].sort_values(ascending=False).head(n)
-    
+
     def get_top_n_real(self, dataset_name, n):
         return self.real_performance[dataset_name].sort_values(ascending=False).head(n)
 
@@ -169,15 +299,36 @@ class Profiler():
         array_profile = np.array(list(dataset_profile.values())).reshape(1, -1)
         result = pd.Series()
         for config_key in self.trained_models:
-            result.loc[str(config_key)] = self.trained_models[config_key].predict(array_profile)
-        
+            result.loc[str(config_key)] = np.clip(
+                self.trained_models[config_key].predict(array_profile), 0, 1)
+
         if n > 0:
             return result.sort_values(ascending=False).head(n)
         return result.sort_values(ascending=False)
 
+
+    def get_ndcg(self, dataset_name, K=10, L=3):
+        ranking_estimate = self.get_ranking(dataset_name, K, L)
+        ranking_best = self.get_best_ranking(dataset_name, K, L)
+        real_scores = self.get_top_n_real(dataset_name, -1)
+        
+        dcg = get_dcgi(ranking_estimate, real_scores)["dcg_i"].sum()
+        idcg = get_dcgi(ranking_best, real_scores)["dcg_i"].sum()
+        ndcg = dcg / idcg
+        
+        return ndcg, ranking_estimate, ranking_best
+
+    def get_ranking(self, dataset_name, K=10, L=3):
+        return extract_K_L_ranking(self.get_top_n_estimated(dataset_name, -1), K, L, self.metric)
+
+    def get_best_ranking(self, dataset_name, K=10, L=3):
+        return extract_K_L_ranking(self.get_top_n_real(dataset_name, -1), K, L, self.metric)
+
     def get_ranking_and_scores(self, dataset_name, number_of_results=5):
-        estimated_performance_top = self.get_top_n_estimated(dataset_name, number_of_results)
-        real_performance_top = self.get_top_n_real(dataset_name, number_of_results)
+        estimated_performance_top = self.get_top_n_estimated(
+            dataset_name, number_of_results)
+        real_performance_top = self.get_top_n_real(
+            dataset_name, number_of_results)
 
         estimated_performance_list = list(estimated_performance_top.index)
         estimated_performance_list.reverse()
@@ -187,16 +338,19 @@ class Profiler():
         for config_key in real_performance_top.index:
             real_rank += 1
             if config_key in estimated_performance_list:
-                rel_i = (estimated_performance_list.index(config_key) + 1) / len(estimated_performance_list)
+                rel_i = (estimated_performance_list.index(
+                    config_key) + 1) / len(estimated_performance_list)
             else:
                 rel_i = 0
 
-            best_rel_i = (len(real_performance_top) - real_rank + 1) / len(real_performance_top)
-            
+            best_rel_i = (len(real_performance_top) -
+                          real_rank + 1) / len(real_performance_top)
+
             score = (2**rel_i - 1) / math.log2(real_rank + 1)
             best_score = (2**best_rel_i - 1) / math.log2(real_rank + 1)
-            
-            ranking_results.append({"config": config_key, "rel_i": rel_i, "best_rel": best_rel_i, "real_rank": real_rank, "score": score, "best_score": best_score})
+
+            ranking_results.append({"config": config_key, "rel_i": rel_i, "best_rel": best_rel_i,
+                                    "real_rank": real_rank, "score": score, "best_score": best_score})
 
         ranking_df = pd.DataFrame(ranking_results)
         dcg_rank = ranking_df["score"].sum()
@@ -209,11 +363,13 @@ class Profiler():
         rank_scores = []
         for dataset_name in dataset_names:
             try:
-                ranking_df, dcg_rank, ndcg_rank = self.get_ranking_and_scores(dataset_name, number_of_results)
-                rank_scores.append({"dataset": dataset_name, "DCG": dcg_rank, "nDCG": ndcg_rank})
+                ranking_df, dcg_rank, ndcg_rank = self.get_ranking_and_scores(
+                    dataset_name, number_of_results)
+                rank_scores.append(
+                    {"dataset": dataset_name, "DCG": dcg_rank, "nDCG": ndcg_rank})
             except KeyError:
                 pass
-        
+
         if len(rank_scores) == 0:
             return None, -1, -1
 
@@ -229,28 +385,27 @@ class Profiler():
         This method profiles the dataset.
         """
 
-        measures=["mean", "max", "min", "variance"]
+        measures = ["mean", "max", "min", "variance"]
         inputs = [
-                "characters_unique",
-                "characters_alphabet",
-                "characters_numeric",
-                "characters_punctuation",
-                "characters_miscellaneous",
-                "words_unique",
-                "words_alphabet",
-                "words_numeric",
-                "words_punctuation",
-                "words_miscellaneous",
-                "words_length",
-                "cells_unique",
-                "cells_alphabet",
-                "cells_numeric",
-                "cells_punctuation",
-                "cells_miscellaneous",
-                "cells_length",
-                "cells_null"
-            ]
-
+            "characters_unique",
+            "characters_alphabet",
+            "characters_numeric",
+            "characters_punctuation",
+            "characters_miscellaneous",
+            "words_unique",
+            "words_alphabet",
+            "words_numeric",
+            "words_punctuation",
+            "words_miscellaneous",
+            "words_length",
+            "cells_unique",
+            "cells_alphabet",
+            "cells_numeric",
+            "cells_punctuation",
+            "cells_miscellaneous",
+            "cells_length",
+            "cells_null"
+        ]
 
         print("Profiling dataset {}...".format(d.name))
         characters_unique_list = [0.0] * d.dataframe.shape[1]
@@ -327,17 +482,19 @@ class Profiler():
                     cells_null_list[column] += 1
             if sum(words_dictionary.values()) > 0:
                 words_length_list[column] /= sum(words_dictionary.values())
-            sorted_keywords_dictionary = sorted(keywords_dictionary.items(), key=operator.itemgetter(1), reverse=True)
+            sorted_keywords_dictionary = sorted(
+                keywords_dictionary.items(), key=operator.itemgetter(1), reverse=True)
             for keyword, frequency in sorted_keywords_dictionary[:KEYWORDS_COUNT_PER_COLUMN]:
                 if keyword not in stop_words_set:
-                    top_keywords_dictionary[keyword] = float(frequency) / d.dataframe.shape[0]
+                    top_keywords_dictionary[keyword] = float(
+                        frequency) / d.dataframe.shape[0]
 
         def calc_mean(columns_value_list):
             return np.mean(columns_value_list).astype(np.float)
 
         def calc_variance(columns_value_list):
             return np.var(columns_value_list).astype(np.float)
-            
+
         def calc_min(columns_value_list):
             return min(columns_value_list)
 
@@ -351,5 +508,6 @@ class Profiler():
         for input_var in inputs:
             for measure in measures:
                 labels.append(input_var + "_" + measure)
-                dataset_profile[input_var + "_" + measure] = eval("calc_" + measure + "(" + input_var + "_list)")
+                dataset_profile[input_var + "_" + measure] = eval(
+                    "calc_" + measure + "(" + input_var + "_list)")
         return dataset_profile

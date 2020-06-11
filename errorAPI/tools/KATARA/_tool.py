@@ -61,9 +61,8 @@ class KATARA(Tool):
         result_path = dataset_path + "-katara_output"
         dataset.write_csv_dataset(dataset_path, dataset.dataframe)
 
-        process = "java -jar " + katara_path + " " + dataset_path + " " +  absolute_path + " " + str(self.configuration["frequency_threshold"])
-        os.system(process)
-        
+        process = ["java", "-jar", katara_path, dataset_path, absolute_path, str(self.configuration["frequency_threshold"])]
+        self.run_subprocess(process)
         if os.path.exists(result_path):
             errors_out = pd.read_csv(result_path, header=None)
             out_series = errors_out.apply(lambda x: (int(x[0]) - 1, int(x[1])), axis=1)

@@ -7,22 +7,21 @@ from errorAPI.tools import *
 from typing import Type
 from .dataset import Dataset
 import subprocess
-from multiprocessing import Manager, Process
-from concurrent.futures import TimeoutError
-import queue
+from multiprocessing import Manager, Process, TimeoutError
 import psutil
-
 
 class ToolCreator:
     @staticmethod
-    def list_tools():
-        print("Available tools:")
-
+    def all_tools():
         d = os.path.dirname(__file__)+'/tools/'
         tools = [o for o in os.listdir(d)
                  if os.path.isdir(os.path.join(d, o)) and not(o.startswith("_"))]
-        print(tools)
         return tools
+
+    @staticmethod
+    def list_tools():
+        print("Available tools:")        
+        print(ToolCreator.all_tools())
 
     def createTool(self, which_tool=None, configuration=None):
         if which_tool is None or configuration is None:
@@ -57,38 +56,60 @@ class Tool(ABC):
     def help(self):
         print("No help specified for this tool.")
 
-    def run_subprocess(self, args):
-        p = subprocess.Popen(args)
+    def run_subprocess(self, args, output_path=None):
+        if output_path is None:
+            p = subprocess.Popen(args)
+        else:
+            with open(output_path, "w") as log:
+                p = subprocess.Popen(args, stdout=log)
         self.processes.put(p.pid)
         p.wait()
+        if p.returncode != 0:
+            raise Exception('Error, returncode ' + str(p.returncode))
 
     def kill_subs(self):
         while not self.processes.empty():
-            pid = self.processes.get()
-            p = psutil.Process(pid)
-            p.kill()
+            try:
+                pid = self.processes.get()
+                p = psutil.Process(pid)
+                p.kill()
+            except psutil.NoSuchProcess:
+                pass
 
-    def run_helper(self, d, shared_q):
+    def run_helper(self, d, shared_q, results_dict):
         self.processes = shared_q
-        return self.run(d)
+        try:
+            result = self.run(d)
+            results_dict.update(result)
+        except Exception as e:
+            results_dict["Error"] = e
 
     def run_with_timeout(self, d, timeout):
-        try:
-            p = Process(target=self.run_helper,
-                        args=(d, self.processes))
+            try:
+                manager = Manager()
+                results_dict = manager.dict()
+                p = Process(target=self.run_helper,
+                            args=(d, self.processes, results_dict), daemon=False)
+                            
+                p.start()
+                p.join(timeout=timeout)
 
-            p.deamon = True
-
-            p.start()
-            results = p.join(timeout=timeout)
-            if results is not None:
-                return results
-
-            raise TimeoutError
-        except TimeoutError as e:
-            self.kill_subs()
-            print("Shutting down process:", p)
-            if p.is_alive():
-                p.terminate()
-                p.join()
-            raise e
+                if p.is_alive():
+                    raise TimeoutError
+                else:
+                    if "Error" in results_dict:
+                        raise Exception(results_dict["Error"])
+                    return results_dict.copy()
+            except TimeoutError as e:
+                self.kill_subs()
+                print("Shutting down process:", p)
+                if p.is_alive():
+                    p.terminate()
+                    p.join()
+                raise e
+            except Exception as e:
+                self.kill_subs()
+                if p.is_alive():
+                    p.terminate()
+                    p.join()
+                raise e
