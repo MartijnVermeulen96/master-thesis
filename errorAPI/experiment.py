@@ -143,6 +143,7 @@ class Experiment:
         result["human_accuracy"] = tool.human_accuracy
 
         if self.upload_on_the_go:
+            print("Uploading!")
             pd.DataFrame.from_dict([result]).to_sql(
                 "results", self.engine, if_exists='append', index=False)
 

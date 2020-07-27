@@ -31,10 +31,12 @@ class Dataset:
         return os.listdir(directory)
 
     @staticmethod
-    def upload_info(sql_string='', directory='datasets'):
+    def upload_info(sql_string='', directory='datasets', all_datasets=None):
         engine = create_engine(sql_string)
 
-        all_datasets = os.listdir(directory)
+        if all_datasets is None:
+            all_datasets = os.listdir(directory)
+        
         results_list = []
         for ds in all_datasets:
             print("Loading", ds)
@@ -46,19 +48,21 @@ class Dataset:
             num_rows = len(d.dataframe)
             num_columns = len(d.dataframe.columns)
             data_quality = d.get_data_quality()
+            num_errors = len(d.actual_errors_dictionary)
 
             results_list.append(
                 {
                     "name": ds,
                     "data_quality": data_quality,
                     "num_rows": num_rows,
-                    "num_columns": num_columns
+                    "num_columns": num_columns,
+                    "num_errors": num_errors
                 }
             )
         
         results_df = pandas.DataFrame.from_dict(results_list)
-        results_df.to_sql('datasets', engine, if_exists='append')
-        print("Succesfully appended the dataset information (Please remove old dataset info manually)")
+        results_df.to_sql('datasets', engine, if_exists='replace')
+        print("Succesfully replaced the dataset information")
 
     @staticmethod
     def print_scores(d, results):

@@ -19,26 +19,42 @@ from sklearn.feature_selection import VarianceThreshold, SelectFromModel, Select
 
 
 def performance_prediction_info(errors_estimation, chosen_metric=""):
+    """
+    Given an estimation error DataFrame, display statistics about the estimation
+
+    :param errors_estimation: Errors estimation input
+    :type errors_estimation: pd.DataFrame
+    :param chosen_metric: Which to metric print, defaults to ""
+    :type chosen_metric: str, optional
+    """    
     errors = errors_estimation.values.flatten()
-    x = abs(errors[~np.isnan(errors)])
+    errors = errors[~np.isnan(errors)]
+    x = abs(errors)
 
     mean_squared_error = np.mean(x ** 2)
-    mean_error = np.mean(x)
-    median_error = np.median(x)
+    mean_absolute_error = np.mean(x)
+    median_absolute_error = np.median(x)
+
+    mean_error = np.mean(errors)
+    median_error = np.median(errors)
+
     variance_error = np.var(x)
     percentile95_error = np.percentile(x, 95)
+
 
     title = "-=" * 5 + " Performance estimation " + chosen_metric + "-=" * 5
     print(title)
     print()
     print("Mean square error:\t", "{:.4f}".format(mean_squared_error))
+    print("-"*5)
+    print("Mean absolute error:\t\t", "{:.4f}".format(mean_absolute_error))
+    print("Median absolute error:\t\t", "{:.4f}".format(median_absolute_error))
+    print("-"*5)
     print("Mean error:\t\t", "{:.4f}".format(mean_error))
     print("Median error:\t\t", "{:.4f}".format(median_error))
     print("Error variance:\t\t", "{:.4f}".format(variance_error))
     print("95th percentile:\t", "{:.4f}".format(percentile95_error))
     print()
-    # fig = sns.distplot(errors).set_title('Performance prediction error distribution')
-    # return fig
     print("-=" * int(len(title) / 2))
 
 
@@ -54,19 +70,37 @@ def extract_K_L_ranking(ranking, K, L, which_metric="Score"):
     ranking_df = pd.DataFrame(ranking_dict)
     return ranking_df.groupby("Tool").head(L).reset_index(drop=True).head(K)
 
-def get_dcgi(ranking, real_scores):
-    ranking["rel_r"] = ranking.apply(lambda row: real_scores[str((row[0], row[1]))], axis=1)
+def get_dcgi(ranking, real_scores, tool_wise=False):
+    if len(ranking) == 0:
+        ranking["rel_r"] = []
+    else:
+        ranking["rel_r"] = ranking.apply(
+            lambda row: get_relevance(real_scores, row, tool_wise), axis=1)
     ranking["r"] = range(1, len(ranking) + 1)
     ranking["dcg_i"] = ranking["rel_r"] / np.log(ranking["r"] + 1)
     return ranking
+
+def get_relevance(real_scores, row, tool_wise):
+    if tool_wise:
+        tool = row[0]
+        try:
+            return real_scores[real_scores.index.map(lambda x: eval(x)[0] == tool)].max()
+        except:
+            return 0
+    else:
+        key = str((row[0], row[1]))
+        try:
+            return real_scores[key]
+        except:
+            return 0
+
 
 class CombinedProfiler():
     def __init__(self, precision_profiler, recall_profiler, f1_profiler):
         self.precision_profiler = precision_profiler
         self.recall_profiler = recall_profiler
         self.f1_profiler = f1_profiler
-        self.f1_estimation_performance = self.precision_profiler.estimation_performance * \
-            self.recall_profiler.estimation_performance
+        self.metric = "F1"
 
     def get_real_performance(self, which_metric):
         if which_metric == "precision":
@@ -92,6 +126,45 @@ class CombinedProfiler():
             return self.f1_profiler.estimation_performance
         else:
             return None
+
+    def get_top_n_estimated(self, dataset_name, n, tool_filter=None):
+        unfiltered = self.get_combined_f1_estimation()[dataset_name].sort_values(
+            ascending=False).head(n).fillna(0)
+
+        if tool_filter is None:
+            return unfiltered
+        else:
+            return unfiltered[[eval(x)[0] in tool_filter for x in unfiltered.index]]
+
+    def get_top_n_real(self, dataset_name, n, tool_filter=None):
+        unfiltered = self.get_real_performance(
+            "f1")[dataset_name].sort_values(ascending=False).head(n).fillna(0)
+
+        if tool_filter is None:
+            return unfiltered
+        else:
+            return unfiltered[[eval(x)[0] in tool_filter for x in unfiltered.index]]
+
+    def get_ranking(self, dataset_name, K=10, L=3, tool_filter=None):
+        return extract_K_L_ranking(self.get_top_n_estimated(dataset_name, -1, tool_filter), K, L, self.metric)
+
+    def get_best_ranking(self, dataset_name, K=10, L=3, tool_filter=None):
+        return extract_K_L_ranking(self.get_top_n_real(dataset_name, -1, tool_filter), K, L, self.metric)
+
+    def get_ndcg(self, dataset_name, K, L, tool_filter=None, tool_wise=False):
+        ranking_estimate = self.get_ranking(dataset_name, K, L, tool_filter)
+        ranking_best = self.get_best_ranking(dataset_name, K, L, tool_filter)
+        real_scores = self.get_top_n_real(dataset_name, -1, tool_filter)
+
+        dcg = get_dcgi(ranking_estimate, real_scores, tool_wise)["dcg_i"].sum()
+        idcg = get_dcgi(ranking_best, real_scores, tool_wise)["dcg_i"].sum()
+
+        if idcg == 0:
+            ndcg = 0
+        else:
+            ndcg = dcg / idcg
+
+        return ndcg, ranking_estimate, ranking_best
 
 
 class Profiler():
@@ -243,8 +316,7 @@ class Profiler():
                     continue
 
             self.errors_estimation = self.estimation_performance - self.real_performance
-            self.squared_errors = (
-                self.errors_estimation).applymap(lambda x: x*x)
+            self.squared_errors = (self.errors_estimation).applymap(lambda x: x*x)
         except ValueError:
             traceback.print_exc()
             print("Error training, returning")
@@ -288,11 +360,23 @@ class Profiler():
             print("Not calculated errors")
             return 999999999
 
-    def get_top_n_estimated(self, dataset_name, n):
-        return self.estimation_performance[dataset_name].sort_values(ascending=False).head(n)
+    def get_top_n_estimated(self, dataset_name, n, tool_filter=None):
+        unfiltered = self.estimation_performance[dataset_name].sort_values(
+            ascending=False).head(n).fillna(0)
 
-    def get_top_n_real(self, dataset_name, n):
-        return self.real_performance[dataset_name].sort_values(ascending=False).head(n)
+        if tool_filter is None:
+            return unfiltered
+        else:
+            return unfiltered[[eval(x)[0] in tool_filter for x in unfiltered.index]]
+
+    def get_top_n_real(self, dataset_name, n, tool_filter=None):
+        unfiltered = self.real_performance[dataset_name].sort_values(
+            ascending=False).head(n).fillna(0)
+
+        if tool_filter is None:
+            return unfiltered
+        else:
+            return unfiltered[[eval(x)[0] in tool_filter for x in unfiltered.index]]
 
     def new_estimated_top(self, d: Type[Dataset], n=-1):
         dataset_profile = self.dataset_profiler(d)
@@ -306,78 +390,26 @@ class Profiler():
             return result.sort_values(ascending=False).head(n)
         return result.sort_values(ascending=False)
 
+    def get_ndcg(self, dataset_name, K=10, L=3, tool_filter=None, tool_wise=False):
+        ranking_estimate = self.get_ranking(dataset_name, K, L, tool_filter)
+        ranking_best = self.get_best_ranking(dataset_name, K, L, tool_filter)
+        real_scores = self.get_top_n_real(dataset_name, -1, tool_filter)
 
-    def get_ndcg(self, dataset_name, K=10, L=3):
-        ranking_estimate = self.get_ranking(dataset_name, K, L)
-        ranking_best = self.get_best_ranking(dataset_name, K, L)
-        real_scores = self.get_top_n_real(dataset_name, -1)
-        
-        dcg = get_dcgi(ranking_estimate, real_scores)["dcg_i"].sum()
-        idcg = get_dcgi(ranking_best, real_scores)["dcg_i"].sum()
-        ndcg = dcg / idcg
-        
+        dcg = get_dcgi(ranking_estimate, real_scores, tool_wise)["dcg_i"].sum()
+        idcg = get_dcgi(ranking_best, real_scores, tool_wise)["dcg_i"].sum()
+
+        if idcg == 0:
+            ndcg = 0
+        else:
+            ndcg = dcg / idcg
+
         return ndcg, ranking_estimate, ranking_best
 
-    def get_ranking(self, dataset_name, K=10, L=3):
-        return extract_K_L_ranking(self.get_top_n_estimated(dataset_name, -1), K, L, self.metric)
+    def get_ranking(self, dataset_name, K=10, L=3, tool_filter=None):
+        return extract_K_L_ranking(self.get_top_n_estimated(dataset_name, -1, tool_filter), K, L, self.metric)
 
-    def get_best_ranking(self, dataset_name, K=10, L=3):
-        return extract_K_L_ranking(self.get_top_n_real(dataset_name, -1), K, L, self.metric)
-
-    def get_ranking_and_scores(self, dataset_name, number_of_results=5):
-        estimated_performance_top = self.get_top_n_estimated(
-            dataset_name, number_of_results)
-        real_performance_top = self.get_top_n_real(
-            dataset_name, number_of_results)
-
-        estimated_performance_list = list(estimated_performance_top.index)
-        estimated_performance_list.reverse()
-        ranking_results = []
-
-        real_rank = 0
-        for config_key in real_performance_top.index:
-            real_rank += 1
-            if config_key in estimated_performance_list:
-                rel_i = (estimated_performance_list.index(
-                    config_key) + 1) / len(estimated_performance_list)
-            else:
-                rel_i = 0
-
-            best_rel_i = (len(real_performance_top) -
-                          real_rank + 1) / len(real_performance_top)
-
-            score = (2**rel_i - 1) / math.log2(real_rank + 1)
-            best_score = (2**best_rel_i - 1) / math.log2(real_rank + 1)
-
-            ranking_results.append({"config": config_key, "rel_i": rel_i, "best_rel": best_rel_i,
-                                    "real_rank": real_rank, "score": score, "best_score": best_score})
-
-        ranking_df = pd.DataFrame(ranking_results)
-        dcg_rank = ranking_df["score"].sum()
-        idcg_rank = ranking_df["best_score"].sum()
-        ndcg_rank = dcg_rank / idcg_rank
-
-        return ranking_df, dcg_rank, ndcg_rank
-
-    def batch_ranking_scores(self, dataset_names, number_of_results=10):
-        rank_scores = []
-        for dataset_name in dataset_names:
-            try:
-                ranking_df, dcg_rank, ndcg_rank = self.get_ranking_and_scores(
-                    dataset_name, number_of_results)
-                rank_scores.append(
-                    {"dataset": dataset_name, "DCG": dcg_rank, "nDCG": ndcg_rank})
-            except KeyError:
-                pass
-
-        if len(rank_scores) == 0:
-            return None, -1, -1
-
-        total_ranking_scores_df = pd.DataFrame(rank_scores)
-        ndcg_sum = total_ranking_scores_df["nDCG"].sum()
-        ndcg_std = total_ranking_scores_df["nDCG"].std()
-
-        return total_ranking_scores_df, ndcg_sum, ndcg_std
+    def get_best_ranking(self, dataset_name, K=10, L=3, tool_filter=None):
+        return extract_K_L_ranking(self.get_top_n_real(dataset_name, -1, tool_filter), K, L, self.metric)
 
     @staticmethod
     def dataset_profiler(d: Type[Dataset], KEYWORDS_COUNT_PER_COLUMN=10):

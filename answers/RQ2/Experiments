@@ -15,3 +15,85 @@ All features
 4 
 F1-threshold: 0.05
 All features
+
+------------------------------------------------
+
+5
+F1-threshold: 0.01
+All features
+
+6 
+F1-threshold: 0.01
+Optimized features
+Take 16 most important from Permutation importance
+['cells_length_variance', 'characters_alphabet_variance', 'characters_numeric_variance', 'words_alphabet_variance', 'characters_punctuation_variance', 'characters_miscellaneous_variance', 'words_punctuation_variance', 'words_numeric_variance', 'cells_numeric_variance', 'cells_alphabet_variance', 'words_unique_variance', 'cells_unique_variance', 'words_miscellaneous_variance', 'cells_miscellaneous_variance', 'characters_punctuation_max', 'cells_length_max']
+
+7
+F1-threshold: 0.01
+Take 16 most important from SHAP importance
+['cells_length_variance', 'characters_alphabet_variance', 'characters_numeric_variance', 'words_alphabet_variance', 'characters_punctuation_variance', 'characters_miscellaneous_variance', 'words_punctuation_variance', 'words_numeric_variance', 'cells_numeric_variance', 'words_miscellaneous_variance', 'cells_alphabet_variance', 'words_unique_variance', 'cells_miscellaneous_variance', 'cells_unique_variance', 'cells_length_mean', 'words_alphabet_max']
+
+7
+F1-threshold: 0.01
+Take 8 most important from SHAP importance
+['cells_length_variance', 'characters_alphabet_variance', 'characters_numeric_variance', 'words_alphabet_variance', 'characters_punctuation_variance', 'characters_miscellaneous_variance', 'words_punctuation_variance', 'words_numeric_variance']
+
+8
+F1-threshold: 0.01
+Optimized features
+['cells_length_variance',
+ 'characters_alphabet_variance',
+ 'characters_numeric_variance',
+ 'words_alphabet_variance',
+ 'characters_punctuation_variance',
+ 'characters_miscellaneous_variance',
+ 'words_punctuation_variance',
+ 'words_numeric_variance']
+
+9
+F1-threshold: 0.01
+No "toy"
+All features
+
+10
+F1-threshold: 0.01
+No "toy"
+Take 8 most important from SHAP importance
+['cells_length_variance', 'characters_alphabet_variance', 'characters_numeric_variance', 'characters_punctuation_variance', 'words_alphabet_variance', 'characters_miscellaneous_variance', 'words_punctuation_variance', 'words_numeric_variance']
+
+------------------------------------------------
+
+11
+F1-threshold: 0.01
+Trainable samples threshold 0.75
+
+------------------------------------------------
+
+12
+F1-threshold: 0.01
+Trainable samples threshold 0.75
+
+13
+F1-threshold: 0.01
+Trainable samples threshold 0.75
+No Raha with 0 labeling
+
+14
+F1-threshold: 0.01
+Trainable samples threshold 0.75
+Only mean and variance input features
+
+------------------------------------------------
+Final experiments for in report:
+15 
+F1-threshold: 0
+Trainable samples threshold 0.75
+All features
+Only accurate Raha labeling
+
+
+16
+F1-threshold: 0
+Trainable samples threshold 0.75
+Permutation feature importance > 0  features
+Only accurate Raha labeling

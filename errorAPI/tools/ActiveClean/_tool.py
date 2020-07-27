@@ -25,7 +25,7 @@ class ActiveClean(Tool):
         "sampling_budget": 20
     }
     example_configurations = [
-        {}, {"min_df": 0.5}, {"sampling_budget": 50}, {"sampling_budget": 100}
+        {}, {"min_df": 0.5}, {"sampling_budget": 10}, {"sampling_budget": 20}
     ]
     def __init__(self, configuration):
         if configuration == {}:
@@ -55,34 +55,38 @@ class ActiveClean(Tool):
         labeled_tuples = {}
         adaptive_detector_output = []
         detection_dictionary = {}
-        while len(labeled_tuples) < self.configuration["sampling_budget"]:
-            if len(adaptive_detector_output) < 1:
-                adaptive_detector_output = [i for i in range(dataset.dataframe.shape[0]) if i not in labeled_tuples]
-            labeled_tuples.update({i: 1 for i in np.random.choice(adaptive_detector_output, 1, replace=False)})
-            x_train = []
-            y_train = []
-            for i in labeled_tuples:
-                x_train.append(acfv[i, :])
-                y_train.append(int(sum([(i, j) in actual_errors_dictionary for j in range(dataset.dataframe.shape[1])]) > 0))
-            adaptive_detector_output = []
-            x_test = [acfv[i, :] for i in range(dataset.dataframe.shape[0]) if i not in labeled_tuples]
-            test_rows = [i for i in range(dataset.dataframe.shape[0]) if i not in labeled_tuples]
-            if sum(y_train) == len(y_train):
-                predicted_labels = len(test_rows) * [1]
-            elif sum(y_train) == 0 or len(x_train[0]) == 0:
-                predicted_labels = len(test_rows) * [0]
-            else:
-                model = sklearn.linear_model.SGDClassifier(loss=self.configuration["SGDloss"], alpha=self.configuration["SGDalpha"], max_iter=self.configuration["max_iter"], fit_intercept=True)
-                model.fit(x_train, y_train)
-                predicted_labels = model.predict(x_test)
-            detection_dictionary = {}
-            for index, pl in enumerate(predicted_labels):
-                i = test_rows[index]
-                if pl:
-                    adaptive_detector_output.append(i)
+        try:
+            while len(labeled_tuples) < self.configuration["sampling_budget"]:
+                if len(adaptive_detector_output) < 1:
+                    adaptive_detector_output = [i for i in range(dataset.dataframe.shape[0]) if i not in labeled_tuples]
+                labeled_tuples.update({i: 1 for i in np.random.choice(adaptive_detector_output, 1, replace=False)})
+                x_train = []
+                y_train = []
+                for i in labeled_tuples:
+                    x_train.append(acfv[i, :])
+                    y_train.append(int(sum([(i, j) in actual_errors_dictionary for j in range(dataset.dataframe.shape[1])]) > 0))
+                adaptive_detector_output = []
+                x_test = [acfv[i, :] for i in range(dataset.dataframe.shape[0]) if i not in labeled_tuples]
+                test_rows = [i for i in range(dataset.dataframe.shape[0]) if i not in labeled_tuples]
+                if sum(y_train) == len(y_train):
+                    predicted_labels = len(test_rows) * [1]
+                elif sum(y_train) == 0 or len(x_train[0]) == 0:
+                    predicted_labels = len(test_rows) * [0]
+                else:
+                    model = sklearn.linear_model.SGDClassifier(loss=self.configuration["SGDloss"], alpha=self.configuration["SGDalpha"], max_iter=self.configuration["max_iter"], fit_intercept=True)
+                    model.fit(x_train, y_train)
+                    predicted_labels = model.predict(x_test)
+                detection_dictionary = {}
+                for index, pl in enumerate(predicted_labels):
+                    i = test_rows[index]
+                    if pl:
+                        adaptive_detector_output.append(i)
+                        for j in range(dataset.dataframe.shape[1]):
+                            detection_dictionary[(i, j)] = default_placeholder
+                for i in labeled_tuples:
                     for j in range(dataset.dataframe.shape[1]):
                         detection_dictionary[(i, j)] = default_placeholder
-            for i in labeled_tuples:
-                for j in range(dataset.dataframe.shape[1]):
-                    detection_dictionary[(i, j)] = default_placeholder
+        except:
+            print("No more to label, done")
+            
         return detection_dictionary

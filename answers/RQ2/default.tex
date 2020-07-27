@@ -1,0 +1,32 @@
+\documentclass{article}
+
+\usepackage{float}
+\usepackage{caption, subcaption}
+\usepackage{pgfplots}
+
+\begin{document}
+\begin{figure}
+    \centering
+        \input{XXX_error_histogramcell_prec.pgf}
+        \caption{Precision error histogram}
+        \label{fig:precision_error_hist}
+\end{figure}
+\begin{figure}
+    \centering
+    \input{XXX_error_histogramcell_rec.pgf}
+    \caption{Recall error histogram}
+    \label{fig:recall_error_hist}
+\end{figure}
+\begin{figure}
+    \centering
+    \input{XXX_error_histogramcell_f1.pgf}
+    \caption{F1 error histogram}
+    \label{fig:f1_error_hist}
+\end{figure}
+\begin{figure}
+    \centering
+    \input{XXX_error_histogramcell_f1_combined.pgf}
+    \caption{Combined F1 error histogram}
+    \label{fig:combined_f1_error_hist}
+\end{figure}
+\end{document}
