@@ -181,8 +181,7 @@ class Profiler():
     ]
 
     def __init__(self, which_regressor=None, normalize=None, pca=(None, -1), feature_selection=None, extra_options={}, metric="cell_f1"):
-        if which_regressor is not None:
-            self.which_regressor = which_regressor
+        self.which_regressor = which_regressor
 
         self.metric = metric
 
@@ -222,7 +221,9 @@ class Profiler():
         elif self.which_regressor == "MLR":
             regressor = sklearn.neural_network.MLPRegressor(
                 **self.extra_options)
-
+        else:
+            regressor = None
+            
         if self.normalize is None:
             norm = None
         else:
